@@ -2,18 +2,32 @@
 // Build the Remi Pop web font from the hand-drawn letters in src/lib/assets/chars/<set>/*.png
 // into src/lib/assets/fonts/. All three outputs are committed:
 //
-//   remi-pop.woff2  the font: every dark, opaque pixel of a drawing becomes a square of ink
-//   remi-pop.ttf    the same font with TrueType outlines, to install on a computer (the site uses the woff2)
-//   remi-pop.json   each character's advance and ink height in art pixels, for layout code
+//   remi-pop.woff2  the site's font: every dark, opaque pixel of a drawing becomes a square of ink
+//   remi-pop.ttf    the whole font with TrueType outlines, to install on a computer
+//   remi-pop.json   each character of the site's font: its advance and ink height in art pixels,
+//                   for layout code
+//
+// The site shows capitals only, so its font leaves out the lowercase drawings (lower_*.png) and
+// draws both cases with the capitals. That also keeps descenders out of it: browsers place the
+// baseline using the lowest point of any glyph, so a single descender would lift every line.
+//
+// remi-pop.version.json, beside them, holds the font's version and a fingerprint of what it draws.
+// A build that draws anything differently bumps the version, so Font Book (or any font manager)
+// sees the new font as newer and offers to replace the one installed. Commit it with the font.
 //
 //   pnpm font   → rebuild after adding or changing a drawing (`pnpm build` and the deploy run it too)
 //
 // Name a drawing after its character ("a.png", "ж.png", "7.png"), or, for characters that
-// filenames can't hold, after a name in NAMED ("question.png"). A letter also covers its capital.
-// One em is 32 art pixels, which is one line of text; every drawing stands on the bottom edge.
+// filenames can't hold, after a name in NAMED ("question.png"). A letter also covers its capital,
+// unless "lower_<letter>.png" draws its lowercase: then "<letter>.png" is the capital only (macOS
+// and Windows can't hold "a.png" and "A.png" side by side).
+// One em is 32 art pixels, which is one line of text. A drawing stands on its bottom edge, unless
+// it has one red pixel: then the bottom of that pixel's row is the baseline, and the rows below it
+// hang under the line (the descenders of g, j, p…). The red pixel itself isn't drawn.
 // Letters are 1 art pixel apart and words 8, as they were when the letters were separate images.
 // The same drawings always build the same bytes, so rebuilding never adds noise to the diff.
 
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -29,6 +43,17 @@ const EM = 32; // art pixels per em
 const GAP = 1; // art pixels after each letter, part of its advance
 const SPACE = 7; // advance of a space; with the gap before it, words are 8 art pixels apart
 const CREATED = Date.UTC(2026, 8, 30) / 1000; // a fixed date keeps the output reproducible
+const VERSION_FILE = path.join(OUT, 'remi-pop.version.json');
+
+// Who made it and how it may be used, shown by Font Book and other font managers.
+const DESIGNERS = 'Joshua Thompson';
+const SITE = 'https://postervote.com';
+const COPYRIGHT = `© 2026 ${DESIGNERS}`;
+const LICENSE =
+  'Free for non-commercial use under the Creative Commons Attribution-NonCommercial 4.0 International ' +
+  `licence (CC BY-NC 4.0): credit "Remi Pop by ${DESIGNERS}". For commercial use, get in touch ` +
+  `through ${SITE} for a commercial licence.`;
+const LICENSE_URL = 'https://creativecommons.org/licenses/by-nc/4.0/';
 
 // Characters that URLs, macOS or Windows won't take in a filename.
 const NAMED = {
@@ -74,30 +99,51 @@ const NAMED = {
   less_than: '<',
   greater_than: '>',
   less_than_or_equal_to: '≤',
-  greater_than_or_equal_to: '≥'
+  greater_than_or_equal_to: '≥',
+  arrow_left: '←',
+  arrow_right: '→',
+  cross: '×',
+  backtick: '`',
+  forwardtick: '´'
 };
+
+const LOWER = 'lower_';
 
 async function readDrawings() {
   const files = (await fs.readdir(SRC, { recursive: true })).filter((f) => f.endsWith('.png')).sort();
+  // macOS can store filenames decomposed (й as и + combining breve), so compare in NFC.
+  const names = new Map(files.map((f) => [f, path.basename(f, '.png').normalize('NFC')]));
+  const lowercase = new Set([...names.values()].filter((n) => n.startsWith(LOWER)).map((n) => n.slice(LOWER.length)));
   const drawings = new Map();
   for (const file of files) {
-    // macOS can store filenames decomposed (й as и + combining breve), so compare in NFC.
-    const name = path.basename(file, '.png').normalize('NFC');
-    const char = NAMED[name] ?? name;
+    const name = names.get(file);
+    let char = NAMED[name] ?? name;
+    if (name.startsWith(LOWER)) char = name.slice(LOWER.length).toLowerCase();
+    else if (lowercase.has(char.toLowerCase())) char = char.toUpperCase();
     if ([...char].length !== 1) throw new Error(`${file}: name it after a single character, or add its name to NAMED`);
     if (drawings.has(char)) throw new Error(`${file}: "${char}" is already drawn by ${drawings.get(char).file}`);
-    drawings.set(char, { file, ...PNG.sync.read(await fs.readFile(path.join(SRC, file))) });
+    const png = PNG.sync.read(await fs.readFile(path.join(SRC, file)));
+    drawings.set(char, { file, ...png, descent: descentOf(file, png), lowercase: name.startsWith(LOWER) });
   }
   return drawings;
 }
 
-// Dark, opaque pixels are ink; anything else is background.
-const isInk = (data, i) => data[i + 3] >= 128 && data[i] + data[i + 1] + data[i + 2] < 384;
+// Dark, opaque pixels are ink, except the red baseline marker; anything else is background.
+const isMarker = (data, i) => data[i + 3] >= 128 && data[i] >= 128 && data[i + 1] < 100 && data[i + 2] < 100;
+const isInk = (data, i) => data[i + 3] >= 128 && data[i] + data[i + 1] + data[i + 2] < 384 && !isMarker(data, i);
 
-// How far a drawing's ink reaches up from its bottom edge, in art pixels.
-function inkHeight({ width, height, data }) {
+// Art pixels of a drawing below its baseline: the rows under its red pixel, if it has one.
+function descentOf(file, { width, height, data }) {
+  const rows = [];
+  for (let i = 0; i < data.length; i += 4) if (isMarker(data, i)) rows.push(Math.floor(i / 4 / width));
+  if (rows.length > 1) throw new Error(`${file}: has ${rows.length} red pixels; mark the baseline with one`);
+  return rows.length ? height - 1 - rows[0] : 0;
+}
+
+// How far a drawing's ink reaches up from its baseline, in art pixels.
+function inkHeight({ width, height, data, descent }) {
   for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) if (isInk(data, (y * width + x) * 4)) return height - y;
+    for (let x = 0; x < width; x++) if (isInk(data, (y * width + x) * 4)) return Math.max(0, height - descent - y);
   }
   return 0;
 }
@@ -156,7 +202,9 @@ function makeGlyph(char, codePoints, drawing) {
   const outline = new opentype.Path();
   const contours = trace(drawing);
   for (const points of contours) {
-    points.forEach(([x, y], i) => (i ? outline.lineTo(x * UNIT, y * UNIT) : outline.moveTo(x * UNIT, y * UNIT)));
+    // Up from the baseline, so descenders go below it.
+    const at = ([x, y]) => [x * UNIT, (y - drawing.descent) * UNIT];
+    points.forEach((point, i) => (i ? outline.lineTo(...at(point)) : outline.moveTo(...at(point))));
     outline.close();
   }
   return new opentype.Glyph({
@@ -171,9 +219,11 @@ function makeGlyph(char, codePoints, drawing) {
   });
 }
 
-// opentype.js stamps `modified` with the current time. Copy the fixed `created` time over it,
-// then redo the checksums that covers.
-function stampModified(otf) {
+/**
+ * opentype.js stamps `modified` with the current time and always writes revision 1.0. Copy the
+ * fixed `created` time over `modified`, write `revision`, then redo the checksums that covers.
+ */
+function stampHead(otf, revision) {
   const sum = (from, to) => {
     let s = 0;
     for (let i = from; i < to; i += 4) s = (s + otf.readUInt32BE(i)) >>> 0;
@@ -183,6 +233,7 @@ function stampModified(otf) {
     if (otf.toString('latin1', record, record + 4) !== 'head') continue;
     const head = otf.readUInt32BE(record + 8);
     otf.copy(otf, head + 28, head + 20, head + 28);
+    otf.writeInt32BE(Math.round(revision * 65536), head + 4); // fontRevision, 16.16 fixed point
     otf.writeUInt32BE(0, head + 8);
     otf.writeUInt32BE(sum(head, head + 56), record + 4); // the 54-byte table, zero-padded
     otf.writeUInt32BE((0xb1b0afba - sum(0, otf.length)) >>> 0, head + 8);
@@ -331,51 +382,98 @@ function toTtf(otf, glyphs) {
   return ttf;
 }
 
-const drawings = await readDrawings();
-const space = { advance: SPACE, height: 0 };
-const metrics = { ' ': space, '\u00a0': space };
-const glyphs = [
-  new opentype.Glyph({ name: '.notdef', advanceWidth: SPACE * UNIT, path: new opentype.Path() }),
-  new opentype.Glyph({ name: 'space', unicode: 0x20, unicodes: [0x20, 0xa0], advanceWidth: SPACE * UNIT, path: new opentype.Path() })
-];
-let tallest = 0;
-for (const [char, drawing] of [...drawings].sort(([a], [b]) => a.codePointAt(0) - b.codePointAt(0))) {
-  // The character itself, then its other case unless that has a drawing of its own.
-  const chars = [...new Set([char, char.toUpperCase(), char.toLowerCase()])].filter(
-    (c) => [...c].length === 1 && (c === char || !drawings.has(c))
-  );
-  for (const c of chars) metrics[c] = { advance: drawing.width + GAP, height: inkHeight(drawing) };
-  glyphs.push(makeGlyph(char, chars.map((c) => c.codePointAt(0)), drawing));
-  tallest = Math.max(tallest, drawing.height);
+/** The glyphs for a set of drawings, with each character's metrics and the set's extremes. */
+function glyphSet(drawings) {
+  const space = { advance: SPACE, height: 0 };
+  const metrics = { ' ': space, '\u00a0': space };
+  const glyphs = [
+    new opentype.Glyph({ name: '.notdef', advanceWidth: SPACE * UNIT, path: new opentype.Path() }),
+    new opentype.Glyph({ name: 'space', unicode: 0x20, unicodes: [0x20, 0xa0], advanceWidth: SPACE * UNIT, path: new opentype.Path() })
+  ];
+  let tallest = 0;
+  let deepest = 0;
+  for (const [char, drawing] of [...drawings].sort(([a], [b]) => a.codePointAt(0) - b.codePointAt(0))) {
+    // The character itself, then its other case unless that has a drawing of its own.
+    const chars = [...new Set([char, char.toUpperCase(), char.toLowerCase()])].filter(
+      (c) => [...c].length === 1 && (c === char || !drawings.has(c))
+    );
+    for (const c of chars) metrics[c] = { advance: drawing.width + GAP, height: inkHeight(drawing) };
+    glyphs.push(makeGlyph(char, chars.map((c) => c.codePointAt(0)), drawing));
+    tallest = Math.max(tallest, drawing.height - drawing.descent);
+    deepest = Math.max(deepest, drawing.descent);
+  }
+  // The Windows ascent and descent leave room for drawings taller than a line and for
+  // descenders, so Windows doesn't clip them.
+  const winMetrics = { usWinAscent: Math.max(EM, tallest) * UNIT, usWinDescent: deepest * UNIT };
+  return { glyphs, metrics, tallest, winMetrics };
 }
 
-const font = new opentype.Font({
-  familyName: FAMILY,
-  styleName: 'Regular',
-  unitsPerEm: EM * UNIT,
-  ascender: EM * UNIT,
-  descender: 0,
-  createdTimestamp: CREATED,
-  fsSelection: 0x40 | 0x80, // regular; use the ascender and descender below on Windows too
-  glyphs,
-  // Version 4 defines that Windows flag. The Windows ascent leaves room for drawings taller than a
-  // line, so Windows doesn't clip them.
-  tables: { os2: { version: 4, usWinAscent: Math.max(EM, tallest) * UNIT, usWinDescent: 0 } }
-});
-const otf = Buffer.from(font.toArrayBuffer());
-stampModified(otf);
-const woff2 = toWoff2(otf);
-const ttf = toTtf(otf, glyphs);
+const drawings = await readDrawings();
+const full = glyphSet(drawings);
+const site = glyphSet(new Map([...drawings].filter(([, d]) => !d.lowercase)));
+const descending = [...drawings.values()].filter((d) => !d.lowercase && d.descent);
+if (descending.length) {
+  throw new Error(`${descending.map((d) => d.file).join(', ')}: only lowercase letters can go below the baseline (see above)`);
+}
+
+// Everything a font manager would see differently, so the version only moves when the font does.
+const fingerprint = crypto
+  .createHash('sha256')
+  .update(JSON.stringify([full.glyphs.map((g) => [g.unicodes, g.advanceWidth, g.path.commands]), full.winMetrics, COPYRIGHT, LICENSE]))
+  .digest('hex')
+  .slice(0, 16);
+const previous = await fs
+  .readFile(VERSION_FILE, 'utf8')
+  .then(JSON.parse)
+  .catch(() => ({ build: 0, fingerprint: null }));
+const build = previous.fingerprint === fingerprint ? previous.build : previous.build + 1;
+// 1.001, 1.002…: font managers compare versions as numbers, and three decimals is what they show.
+const version = `1.${String(build).padStart(3, '0')}`;
+
+/** A set of glyphs as an OpenType font with CFF outlines. */
+function makeFont({ glyphs, winMetrics }) {
+  const font = new opentype.Font({
+    familyName: FAMILY,
+    styleName: 'Regular',
+    version: `Version ${version}`,
+    copyright: COPYRIGHT,
+    designer: DESIGNERS,
+    designerURL: SITE,
+    manufacturer: DESIGNERS,
+    manufacturerURL: SITE,
+    description: `The hand-drawn lettering of Poster Vote! (${SITE}).`,
+    license: LICENSE,
+    licenseURL: LICENSE_URL,
+    unitsPerEm: EM * UNIT,
+    ascender: EM * UNIT,
+    descender: 0,
+    createdTimestamp: CREATED,
+    fsSelection: 0x40 | 0x80, // regular; use the ascender and descender below on Windows too
+    glyphs,
+    // Version 4 defines that Windows flag. The descender stays 0, so the line is still one em with
+    // the baseline at its bottom, and descenders hang below it.
+    tables: { os2: { version: 4, ...winMetrics } }
+  });
+  // Unique per version, so the system doesn't mistake one version's cached copy for another's.
+  for (const names of Object.values(font.names)) names.uniqueID = { en: `${FAMILY} Regular ${version}` };
+  const otf = Buffer.from(font.toArrayBuffer());
+  stampHead(otf, Number(version));
+  return otf;
+}
+
+const woff2 = toWoff2(makeFont(site));
+const ttf = toTtf(makeFont(full), full.glyphs);
 
 await fs.mkdir(OUT, { recursive: true });
 await fs.writeFile(path.join(OUT, 'remi-pop.woff2'), woff2);
 await fs.writeFile(path.join(OUT, 'remi-pop.ttf'), ttf);
 // One character per line, with the invisible non-breaking space spelled out.
 const jsonKey = (c) => JSON.stringify(c).replace('\u00a0', '\\u00a0');
-const entries = Object.entries(metrics).map(([c, m]) => `  ${jsonKey(c)}: ${JSON.stringify(m)}`);
+const entries = Object.entries(site.metrics).map(([c, m]) => `  ${jsonKey(c)}: ${JSON.stringify(m)}`);
 await fs.writeFile(path.join(OUT, 'remi-pop.json'), `{\n${entries.join(',\n')}\n}\n`);
+await fs.writeFile(VERSION_FILE, `${JSON.stringify({ build, fingerprint }, null, 2)}\n`);
 console.log(
-  `${FAMILY}: ${drawings.size} drawings, ${entries.length} characters, ` +
+  `${FAMILY} ${version}${build === previous.build ? '' : ' (new)'}: ${drawings.size} drawings, ${entries.length} characters on the site, ` +
     `remi-pop.woff2 ${(woff2.length / 1024).toFixed(1)} KB, remi-pop.ttf ${(ttf.length / 1024).toFixed(1)} KB`
 );
-if (tallest > EM) console.warn(`  ! the tallest drawing is ${tallest} art px, taller than a line (${EM}); it will overlap the line above`);
+if (full.tallest > EM) console.warn(`  ! the tallest drawing is ${full.tallest} art px, taller than a line (${EM}); it will overlap the line above`);

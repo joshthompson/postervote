@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as bradleyTerry from "../bradleyTerry.js";
 import type * as competitions from "../competitions.js";
 import type * as crons from "../crons.js";
 import type * as migrations from "../migrations.js";
@@ -24,6 +25,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  bradleyTerry: typeof bradleyTerry;
   competitions: typeof competitions;
   crons: typeof crons;
   migrations: typeof migrations;
