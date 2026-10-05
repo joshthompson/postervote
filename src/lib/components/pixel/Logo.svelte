@@ -97,6 +97,8 @@
     align-items: flex-end;
     /* One em is 32 art px; the box is trimmed to the tallest letter, as in PixelText. */
     font: 800 calc(var(--px) * 32px) / 1 var(--font-pixel);
+    /* Always capitals, like PixelText. */
+    text-transform: uppercase;
     margin-top: calc(var(--px) * var(--headroom) * -1px);
     color: black;
     -webkit-font-smoothing: antialiased;

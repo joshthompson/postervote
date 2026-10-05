@@ -2,6 +2,8 @@
 // lib/styles/fonts.css), which `pnpm font` builds from the drawings in lib/assets/chars.
 // One em is 32 art px: a line of text, with every letter standing on its bottom edge.
 // These are the letters' sizes, for layout that has to know them before the text is drawn.
+// The site shows the letters in capitals only (text-transform in PixelText and Logo), so text is
+// measured in capitals too.
 
 import data from '$lib/assets/fonts/remi-pop.json';
 
@@ -17,7 +19,7 @@ const metricsOf = (char: string) => metrics[char.normalize('NFC')] ?? FALLBACK;
 // Width of the widest word in art px. Each letter's advance includes the art pixel after it,
 // which the last letter doesn't need.
 export const widestWord = (text: string): number =>
-  Math.max(...text.split(' ').map((word) => [...word].reduce((w, char) => w + metricsOf(char).advance, 0) - 1));
+  Math.max(...text.toUpperCase().split(' ').map((word) => [...word].reduce((w, char) => w + metricsOf(char).advance, 0) - 1));
 
 // Art px between the top of the line and the top of the text's tallest letter.
-export const headroom = (text: string): number => EM - Math.max(0, ...[...text].map((char) => metricsOf(char).height));
+export const headroom = (text: string): number => EM - Math.max(0, ...[...text.toUpperCase()].map((char) => metricsOf(char).height));

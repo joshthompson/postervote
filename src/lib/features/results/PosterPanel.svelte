@@ -2,6 +2,7 @@
   import { useQuery } from 'convex-svelte';
   import type { Snippet } from 'svelte';
   import { api } from '$convex/api';
+  import PixelText from '$lib/components/pixel/PixelText.svelte';
   import IconButton from '$lib/components/ui/IconButton.svelte';
   import Loader from '$lib/components/ui/Loader.svelte';
   import Meter from '$lib/components/ui/Meter.svelte';
@@ -64,7 +65,7 @@
       {#if shareHref}<ShareButton href={shareHref} title={poster.title} {onshare} />{/if}
       {#if onclose}
         <IconButton label={t.detail.close} onclick={onclose}>
-          <span class="x" aria-hidden="true">×</span>
+          <span class="x" aria-hidden="true"><PixelText text="×" px={1} color="currentColor" /></span>
         </IconButton>
       {/if}
     </div>
@@ -169,9 +170,11 @@
     display: flex;
     gap: 8px;
   }
+  /* The drawn × sits 8 art px above the baseline, so its box has that much empty below it.
+     Nudge it down by half (at 1 screen px per art px) to centre the cross in the button. */
   .x {
-    font-size: 26px;
-    line-height: 1;
+    display: flex;
+    translate: 0 4px;
   }
 
   .poster {

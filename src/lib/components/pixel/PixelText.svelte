@@ -49,6 +49,8 @@
     /* One line is one em, 32 art px; the letters stand on its bottom edge. The weight is for
        fallback characters: the pixel face covers every weight. */
     font: 800 calc(var(--s) * 32px) / 1 var(--font-pixel);
+    /* Always capitals: the font has lowercase letters, but the site doesn't use them. */
+    text-transform: uppercase;
     /* Trim the empty top of the first line down to the tallest letter, so the box hugs the
        letters and a label sits centred where it's placed. Most letters are 26–29 art px tall. */
     margin-top: calc(var(--s) * var(--headroom) * -1px);
