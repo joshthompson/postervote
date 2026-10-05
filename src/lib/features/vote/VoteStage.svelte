@@ -96,7 +96,13 @@
       chosen_side: i === 0 ? 'left' : 'right',
       method
     } as const;
-    if (!session.result) return track('poster_vote_failed', props);
+    if (!session.result) {
+      return track('poster_vote_failed', {
+        ...props,
+        failure: session.error ?? 'failed',
+        is_connected: client.connectionState().isWebSocketConnected
+      });
+    }
     track('poster_voted', {
       ...props,
       crowd_share: session.result.pct[i],
@@ -109,8 +115,8 @@
   }
 
   function skip() {
-    if (session.phase !== 'choose' || !session.pair) return;
-    const pair = session.pair;
+    if (!session.canVote) return;
+    const pair = session.pair!;
     track('pair_skipped', {
       competition,
       poster_ids: pair.map((p) => p._id),
@@ -132,10 +138,40 @@
     track('autoplay_toggled', { is_autoplay_paused: session.paused });
   }
 
+  // Votes looked back at since opening past votes, for the analytics events.
+  const viewed = new Set<number>();
+
+  function openPastVotes() {
+    const placement = session.phase === 'reveal' ? 'vote_reveal' : 'vote_pair';
+    session.lookBack();
+    viewed.clear();
+    viewed.add(session.viewing!);
+    track('past_votes_opened', { placement, votes_this_visit: votes });
+  }
+
+  function step(by: -1 | 1) {
+    session.step(by);
+    viewed.add(session.viewing!);
+  }
+
+  /** Back from past votes to voting. */
+  function continueVoting(method: 'click' | 'keyboard') {
+    track('past_votes_closed', { method, votes_viewed: viewed.size });
+    session.stopLookingBack();
+  }
+
   const toRankings = () => track('nav_link_clicked', { destination: 'rankings', placement: 'vote_message' });
 
   function onKey(e: KeyboardEvent) {
-    if (session.canVote) {
+    if (session.viewing !== null) {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') step(-1);
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') step(1);
+      if (e.key === 'Enter' || e.key === ' ') {
+        if (e.target instanceof HTMLButtonElement && !e.target.disabled) return;
+        e.preventDefault();
+        continueVoting('keyboard');
+      }
+    } else if (session.canVote) {
       if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') vote(0, 'keyboard');
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') vote(1, 'keyboard');
     } else if (session.revealed && session.result && (e.key === 'Enter' || e.key === ' ')) {
@@ -149,16 +185,29 @@
   const t = $derived(i18n.t.vote);
   const leaving = $derived(session.phase === 'exit');
   const showingResult = $derived(session.phase === 'reveal' || leaving);
+  // What's on screen: the current pair, or the old vote they're looking back at.
+  const shown = $derived(
+    session.viewed ?? {
+      pair: session.pair,
+      chosen: session.chosen,
+      result: session.result,
+      streak: session.streak,
+      round: session.round
+    }
+  );
+  const lookingBack = $derived(session.viewing !== null);
+  // Replays the cards' entrance for each new pair, and each old vote stepped to.
+  const showKey = $derived(lookingBack ? `past-${session.viewing}` : session.round);
   // Each pair moves on to the next wording of the verdict, from a random start for each visit.
   const firstVariant = Math.floor(Math.random() * 100);
   const verdict = $derived(
-    showingResult
+    showingResult || lookingBack
       ? verdictFor(t, {
-          error: session.error,
-          result: session.result,
-          chosen: session.chosen,
-          streak: session.streak,
-          variant: firstVariant + session.round
+          error: !lookingBack && !!session.error,
+          result: shown.result,
+          chosen: shown.chosen,
+          streak: shown.streak,
+          variant: firstVariant + shown.round
         })
       : ''
   );
@@ -195,34 +244,57 @@
         <Pill href={resolve('/results')} onclick={toRankings}>{t.seeRankings}</Pill>
       </ButtonRow>
     </MessageCard>
-  {:else if !session.pair}
+  {:else if !shown.pair}
     <Loader />
   {:else}
-    {#key session.round}
+    {@const { pair, chosen, result } = shown}
+    {#key showKey}
       <div class="pair">
-        {#each session.pair as poster, i (poster._id)}
+        {#each pair as poster, i (poster._id)}
           <PosterCard
             {poster}
             side={i === 0 ? 0 : 1}
-            chosen={session.chosen === i}
-            rejected={session.chosen !== null && session.chosen !== i}
+            chosen={chosen === i}
+            rejected={chosen !== null && chosen !== i}
             {leaving}
-            disabled={session.phase !== 'choose'}
-            pct={session.result?.pct[i]}
-            winner={session.result ? session.result.pct[i] >= session.result.pct[1 - i] : false}
+            disabled={session.phase !== 'choose' || lookingBack}
+            pct={result?.pct[i]}
+            winner={result ? result.pct[i] >= result.pct[1 - i] : false}
             shareHref={shareHref(poster)}
-            onshare={(outcome) => track('poster_shared', { ...about(poster), placement: 'vote_reveal', outcome })}
+            onshare={(outcome) =>
+              track('poster_shared', {
+                ...about(poster),
+                placement: lookingBack ? 'past_votes' : 'vote_reveal',
+                outcome
+              })}
             onclick={() => vote(i, 'click')}
           />
-          {#if i === 0}<VsBadge hidden={showingResult} />{/if}
+          {#if i === 0}<VsBadge hidden={showingResult || lookingBack} />{/if}
         {/each}
       </div>
     {/key}
 
     <div class="footer">
       <div class="action">
-        {#if session.phase === 'choose'}
-          <span class="appear"><Pill onclick={skip}>{t.skip}</Pill></span>
+        {#if lookingBack}
+          <RevealButtons
+            paused={session.paused}
+            duration={REVEAL_MS}
+            ontoggle={toggleAutoplay}
+            onnext={() => next('click')}
+            back={{
+              canPrev: session.viewing! > 0,
+              canNext: session.viewing! < session.history.length - 1,
+              onprev: () => step(-1),
+              onnext: () => step(1),
+              oncontinue: () => continueVoting('click')
+            }}
+          />
+        {:else if session.phase === 'choose'}
+          <span class="appear choosing">
+            {#if session.canLookBack}<Pill onclick={openPastVotes}>{t.pastVotes}</Pill>{/if}
+            <Pill onclick={skip}>{t.skip}</Pill>
+          </span>
         {:else if session.revealed}
           <span class="appear">
             <RevealButtons
@@ -230,6 +302,7 @@
               duration={REVEAL_MS}
               ontoggle={toggleAutoplay}
               onnext={() => next('click')}
+              onhistory={session.canLookBack ? openPastVotes : undefined}
             />
           </span>
         {/if}
@@ -240,11 +313,11 @@
       {/if}
     </div>
 
-    {#key session.round}
+    {#key showKey}
       {#if verdict}
         <VerdictBubble
           text={verdict}
-          detail={session.result ? t.votesOnPair(session.result.total) : undefined}
+          detail={shown.result ? t.votesOnPair(shown.result.total) : undefined}
           {leaving}
         />
       {/if}
@@ -306,6 +379,12 @@
   .appear {
     display: inline-block;
     animation: pop-in 0.5s var(--spring) both 0.3s;
+  }
+  .choosing {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
   }
 
   .intro {

@@ -50,11 +50,13 @@ Nothing is stored on the device: `disable_persistence` keeps the visitor's id ou
 | `voting_started` | The start button, or answering the designer question on a first visit | `trigger`: `start_button` / `designer_answer` | `features/vote/VoteStage.svelte` |
 | `designer_question_answered` | Yes/No on "Are you a designer?" (the answer is `is_designer`) | `placement`: `vote_intro` / `settings` | `VoteStage.svelte`, `routes/settings/+page.svelte` |
 | `poster_voted` | A vote is saved in Convex | `competition`, `poster_id`, `poster_title`, `opponent_poster_id`, `opponent_poster_title`, `chosen_side` (`left` / `right`; top/bottom when stacked), `method`, `crowd_share` (0–100: how much of the pair's vote agrees), `pair_votes`, `crowd_streak`, `votes_this_visit`, `posters_seen` and `posters_total` (until they've seen every poster) | `VoteStage.svelte` |
-| `poster_vote_failed` | Saving a vote fails | as `poster_voted`, up to `method` | `VoteStage.svelte` |
+| `poster_vote_failed` | Saving a vote fails, or gets no answer within 8 seconds | as `poster_voted`, up to `method`, plus `failure` (`failed` / `timeout`) and `is_connected` (Convex's WebSocket, at the time) | `VoteStage.svelte` |
 | `pair_skipped` | The skip button | `competition`, `poster_ids`, `poster_titles` (lists, in screen order), `votes_this_visit` | `VoteStage.svelte` |
 | `reveal_dismissed` | "Next →", or Enter or Space, during the vote reveal (not the automatic advance) | `method`, `is_autoplay_paused` | `VoteStage.svelte` |
+| `past_votes_opened` | "Past Votes", beside autoplay under the vote reveal or beside skip while choosing, to look back at this visit's votes from the newest (no voting, and autoplay stops, while they look) | `placement`: `vote_reveal` / `vote_pair`, `votes_this_visit` | `VoteStage.svelte` |
+| `past_votes_closed` | "Continue voting!" (or Enter or Space) while looking back: on to the next pair from a reveal, or back to the pair they were choosing between | `method`, `votes_viewed` (old votes looked at) | `VoteStage.svelte` |
 | `all_posters_seen` | The "you've seen every poster" message appears | `competition`, `posters_total`, `votes_this_visit` | `VoteStage.svelte` |
-| `poster_shared` | A poster share finishes | `competition`, `poster_id`, `poster_title`, `placement`: `vote_reveal` / `rankings_modal` / `poster_page`, `outcome` | `VoteStage.svelte`, `features/results/ResultsView.svelte`, `features/results/PosterView.svelte` |
+| `poster_shared` | A poster share finishes | `competition`, `poster_id`, `poster_title`, `placement`: `vote_reveal` / `past_votes` / `rankings_modal` / `poster_page`, `outcome` | `VoteStage.svelte`, `features/results/ResultsView.svelte`, `features/results/PosterView.svelte` |
 | `site_shared` | The corner share button finishes | `outcome` | `features/share/SiteShareButton.svelte` |
 | `coffee_link_clicked` | Buy Me a Coffee | `placement`: `corner_button` / `about_page` | `components/layout/CoffeeButton.svelte` |
 | `font_downloaded` | The download button in the About page's Remi Pop section | none | `routes/about/+page.svelte` |

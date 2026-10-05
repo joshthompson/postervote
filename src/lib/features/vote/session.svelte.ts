@@ -1,7 +1,7 @@
 import { posterSrc, preload } from '$lib/utils/images';
 import { pairOrder } from './pairing';
 import { createProgress } from './progress';
-import type { Phase, Poster, VoteResult } from './types';
+import type { PastVote, Phase, Poster, VoteResult } from './types';
 
 // One visitor's run through the pairs: which pair is up, and the enter → choose → reveal → exit
 // cycle around each vote. Knows nothing about Convex; the page passes in its data and a way to vote.
@@ -15,6 +15,12 @@ const ENTER_MS = 400;
 /** How long the revealed votes stay on screen before the next pair, unless paused. */
 export const REVEAL_MS = 3000;
 const EXIT_MS = 700;
+/**
+ * How long a vote waits for Convex before it's shown as failed. Convex holds a mutation until its
+ * WebSocket is connected, so without this a dropped connection (common in in-app browsers) leaves
+ * the pick highlighted with no result, forever.
+ */
+const CAST_TIMEOUT_MS = 8000;
 
 type Source = {
   /** The competition's posters (reactive). */
@@ -35,12 +41,16 @@ type Next = { pair: Poster[]; collection: string; at: number; seen: number; fres
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+class Timeout extends Error {}
+const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Timeout()), ms));
+
 export class VoteSession {
   pair = $state<Poster[] | null>(null);
   phase = $state<Phase>('loading');
   chosen = $state<number | null>(null);
   result = $state<VoteResult | null>(null);
-  error = $state(false);
+  /** Why the last vote didn't go through: it errored, or Convex didn't answer in time. */
+  error = $state<'failed' | 'timeout' | null>(null);
   /** Goes up with every new pair, so the page can replay its entrance animations. */
   round = $state(0);
   /** Votes in a row that went with the crowd. */
@@ -55,6 +65,14 @@ export class VoteSession {
    * across pairs, until they resume.
    */
   paused = $state(false);
+  /** The votes that went through this visit, oldest first. */
+  history = $state.raw<PastVote[]>([]);
+  /**
+   * Which of `history` they're looking back at, or null while on the current pair. They can look
+   * back from a reveal or while choosing. Old votes can't be changed, the current pair can't be
+   * voted on until they're back, and a reveal doesn't move on by itself while they look.
+   */
+  viewing = $state<number | null>(null);
 
   #source: Source;
   #progress = createProgress();
@@ -70,12 +88,46 @@ export class VoteSession {
   }
 
   get canVote() {
-    return this.phase === 'choose' && !!this.pair;
+    return this.phase === 'choose' && !!this.pair && this.viewing === null;
   }
 
   /** Whether the reveal is on screen with something to show, so it can be dismissed. */
   get revealed() {
     return this.phase === 'reveal' && (!!this.result || this.error);
+  }
+
+  /** Whether there's a vote to look back at, from a reveal or while choosing. */
+  get canLookBack() {
+    return (this.revealed || this.phase === 'choose') && this.viewing === null && this.history.length > 0;
+  }
+
+  /** The vote they're looking back at, if they are. */
+  get viewed() {
+    return this.viewing === null ? null : this.history[this.viewing];
+  }
+
+  /** Look back at their votes, from the newest. Stops a reveal moving on. */
+  lookBack() {
+    if (!this.canLookBack) return;
+    this.#stopTimer();
+    this.viewing = this.history.length - 1;
+  }
+
+  /**
+   * Stop looking back: from a reveal, on to the next new pair (that vote is done with), or while
+   * choosing, back to the pair they were choosing between.
+   */
+  stopLookingBack() {
+    if (this.viewing === null) return;
+    if (this.phase === 'reveal') this.advance();
+    else this.viewing = null;
+  }
+
+  /** Step through the votes they're looking back at: -1 for the one before, 1 for the one after. */
+  step(by: -1 | 1) {
+    if (this.viewing === null) return;
+    const to = this.viewing + by;
+    if (to >= 0 && to < this.history.length) this.viewing = to;
   }
 
   /** Every pair of the current posters, for the "you've been through them all" message. */
@@ -103,15 +155,16 @@ export class VoteSession {
     this.#count();
 
     try {
-      const r = await this.#source.cast(winner, loser);
+      const r = await Promise.race([this.#source.cast(winner, loser), timeout(CAST_TIMEOUT_MS)]);
       const total = r.winnerVotes + r.loserVotes;
       const w = Math.round((r.winnerVotes / total) * 100);
       const bySide = (mine: number, other: number): [number, number] => (i === 0 ? [mine, other] : [other, mine]);
       this.result = { pct: bySide(w, 100 - w), votes: bySide(r.winnerVotes, r.loserVotes), total };
       // A tie keeps the streak going. Counted from the votes, as 49.6% would round up to 50.
       this.streak = r.winnerVotes >= r.loserVotes ? this.streak + 1 : 0;
+      this.history = [...this.history, { pair, chosen: i, result: this.result, streak: this.streak, round: this.round }];
     } catch (e) {
-      this.error = true;
+      this.error = e instanceof Timeout ? 'timeout' : 'failed';
       console.error(e);
     }
     this.#left = REVEAL_MS;
@@ -135,7 +188,7 @@ export class VoteSession {
   /** Move on once the reveal has had its time on screen, if it's showing and not paused. */
   #autoAdvance() {
     this.#stopTimer();
-    if (!this.revealed || this.paused) return;
+    if (!this.revealed || this.paused || this.viewing !== null) return;
     this.#since = performance.now();
     this.#revealTimer = setTimeout(() => this.advance(), this.#left);
   }
@@ -146,7 +199,7 @@ export class VoteSession {
   }
 
   skip() {
-    if (this.phase === 'choose') this.advance();
+    if (this.canVote) this.advance();
   }
 
   async advance() {
@@ -160,6 +213,7 @@ export class VoteSession {
     if (this.progress && this.progress.seen >= this.progress.total) {
       this.pair = null;
       this.progress = null;
+      this.viewing = null;
       this.phase = 'seenAll';
       return;
     }
@@ -207,6 +261,7 @@ export class VoteSession {
   async #show(next: Next | null) {
     if (!next) {
       this.pair = null;
+      this.viewing = null;
       this.phase = 'done';
       return;
     }
@@ -216,9 +271,11 @@ export class VoteSession {
 
     this.#shown = next;
     this.pair = next.pair;
+    // Looking back ends with the old pair flying out, then straight on to this one.
+    this.viewing = null;
     this.chosen = null;
     this.result = null;
-    this.error = false;
+    this.error = null;
     const total = this.#source.posters().length;
     this.progress = next.seen < total ? { seen: next.seen, total } : null;
     this.round++;

@@ -47,11 +47,19 @@ export type Events = {
     posters_seen?: number;
     posters_total?: number;
   };
-  poster_vote_failed: AboutVote;
+  poster_vote_failed: AboutVote & {
+    /** `timeout`: Convex didn't answer in time; `failed`: the mutation threw. */
+    failure: 'failed' | 'timeout';
+    /** Whether Convex's WebSocket was connected when it failed. */
+    is_connected: boolean;
+  };
   pair_skipped: { competition?: string; poster_ids: string[]; poster_titles: string[]; votes_this_visit: number };
   reveal_dismissed: { method: Method; is_autoplay_paused: boolean };
+  past_votes_opened: { placement: 'vote_reveal' | 'vote_pair'; votes_this_visit: number };
+  /** `votes_viewed`: how many of the old votes they looked at. */
+  past_votes_closed: { method: Method; votes_viewed: number };
   all_posters_seen: { competition?: string; posters_total: number; votes_this_visit: number };
-  poster_shared: AboutPoster & { placement: 'vote_reveal' | 'rankings_modal' | 'poster_page'; outcome: ShareOutcome };
+  poster_shared: AboutPoster & { placement: 'vote_reveal' | 'past_votes' | 'rankings_modal' | 'poster_page'; outcome: ShareOutcome };
   site_shared: { outcome: ShareOutcome };
   coffee_link_clicked: { placement: 'corner_button' | 'about_page' };
   /** The download button in the About page's section on the font. */

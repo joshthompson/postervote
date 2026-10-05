@@ -14,3 +14,6 @@ export type Phase = 'loading' | 'enter' | 'choose' | 'reveal' | 'exit' | 'seenAl
  * percent), each side's count, and the two added up.
  */
 export type VoteResult = { pct: [number, number]; votes: [number, number]; total: number };
+
+/** A vote cast this visit, as its reveal showed it, to look back on. */
+export type PastVote = { pair: Poster[]; chosen: number; result: VoteResult; streak: number; round: number };

@@ -8,14 +8,29 @@
   // itself, with a border that fills up over `duration` ms until then, or ❚❚ once paused, its
   // border stopped. Clicking it pauses or resumes (`ontoggle`), carrying on from where it was.
   // With a mouse, hovering it shows what a click does. On the right, "Next →" moves on (`onnext`)
-  // and leaves autoplay as it is. Both are --next-height tall.
+  // and leaves autoplay as it is. Before them, when there are earlier votes, "Past Votes" looks back at
+  // them (`onhistory`).
+  //
+  // While looking back (`back`), they're ← and → through the old votes and "Continue voting" on to
+  // the next new pair instead. All are --next-height tall.
+
+  type Back = { canPrev: boolean; canNext: boolean; onprev: () => void; onnext: () => void; oncontinue: () => void };
 
   let {
     paused,
     duration,
     ontoggle,
-    onnext
-  }: { paused: boolean; duration: number; ontoggle: () => void; onnext: () => void } = $props();
+    onnext,
+    onhistory,
+    back
+  }: {
+    paused: boolean;
+    duration: number;
+    ontoggle: () => void;
+    onnext: () => void;
+    onhistory?: () => void;
+    back?: Back | null;
+  } = $props();
 
   const t = $derived(i18n.t.vote);
   const label = $derived(paused ? t.resumeAutoplay : t.pauseAutoplay);
@@ -32,27 +47,40 @@
 </script>
 
 <div class="buttons">
-  <Tooltip text={label}>
-    <button
-      class="autoplay"
-      class:paused
-      onclick={ontoggle}
-      aria-label={label}
-      style="--duration: {duration}ms"
-      bind:clientWidth={w}
-      bind:clientHeight={h}
-    >
-      {#if w}
-        <svg class="ring" viewBox="0 0 {w} {h}" aria-hidden="true">
-          <path class="track" d={border} stroke-width={STROKE} />
-          <path class="fill" d={border} stroke-width={STROKE} pathLength="100" />
-        </svg>
-      {/if}
-      <img class="now" src={paused ? pauseIcon : playIcon} alt="" width="24" height="24" />
-      <img class="then" src={paused ? playIcon : pauseIcon} alt="" width="24" height="24" />
-    </button>
-  </Tooltip>
-  <button class="next" onclick={onnext}>{t.next}</button>
+  {#if back}
+    <Tooltip text={t.previousVote}>
+      <button class="paper arrow" disabled={!back.canPrev} onclick={back.onprev} aria-label={t.previousVote}>←</button>
+    </Tooltip>
+    <Tooltip text={t.nextVote}>
+      <button class="paper arrow" disabled={!back.canNext} onclick={back.onnext} aria-label={t.nextVote}>→</button>
+    </Tooltip>
+    <button class="next" onclick={back.oncontinue}>{t.continueVoting}</button>
+  {:else}
+    {#if onhistory}
+      <button class="paper history" onclick={onhistory}>{t.pastVotes}</button>
+    {/if}
+    <Tooltip text={label}>
+      <button
+        class="paper autoplay"
+        class:paused
+        onclick={ontoggle}
+        aria-label={label}
+        style="--duration: {duration}ms"
+        bind:clientWidth={w}
+        bind:clientHeight={h}
+      >
+        {#if w}
+          <svg class="ring" viewBox="0 0 {w} {h}" aria-hidden="true">
+            <path class="track" d={border} stroke-width={STROKE} />
+            <path class="fill" d={border} stroke-width={STROKE} pathLength="100" />
+          </svg>
+        {/if}
+        <img class="now" src={paused ? pauseIcon : playIcon} alt="" width="24" height="24" />
+        <img class="then" src={paused ? playIcon : pauseIcon} alt="" width="24" height="24" />
+      </button>
+    </Tooltip>
+    <button class="next" onclick={onnext}>{t.next}</button>
+  {/if}
 </div>
 
 <style>
@@ -81,7 +109,7 @@
     }
   }
   @media (hover: hover) {
-    button:hover {
+    button:not(:disabled):hover {
       transform: translateY(-2px) rotate(-2deg) scale(1.05);
     }
   }
@@ -90,15 +118,33 @@
     outline-offset: 3px;
   }
 
-  .autoplay {
-    padding: 0 1.1em;
+  button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .paper {
     background: var(--card);
+    color: var(--ink);
     box-shadow: 0 8px 24px -6px rgba(255, 59, 92, 0.5);
+  }
+  .autoplay,
+  .arrow {
+    padding: 0 1.1em;
+  }
+  .history {
+    padding: 0 1.2em;
   }
   .next {
     padding: 0 1.6em;
     background: var(--red);
     color: white;
+  }
+  /* "Past Votes", autoplay and "Next →" side by side must fit a 375px phone. */
+  @media (max-width: 560px) {
+    .history,
+    .next {
+      padding: 0 1em;
+    }
   }
 
   .ring {
