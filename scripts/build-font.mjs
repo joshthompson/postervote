@@ -17,10 +17,10 @@
 //
 //   pnpm font   → rebuild after adding or changing a drawing (`pnpm build` and the deploy run it too)
 //
-// Name a drawing after its character ("a.png", "ж.png", "7.png"), or, for characters that
-// filenames can't hold, after a name in NAMED ("question.png"). A letter also covers its capital,
-// unless "lower_<letter>.png" draws its lowercase: then "<letter>.png" is the capital only (macOS
-// and Windows can't hold "a.png" and "A.png" side by side).
+// Name a drawing after its character ("ж.png", "7.png"), or, for characters that filenames can't
+// hold, after a name in NAMED ("question.png"). A letter's drawing covers both its cases. To draw
+// them separately, name them "upper_<letter>.png" and "lower_<letter>.png" (macOS and Windows
+// can't hold "a.png" and "A.png" side by side). A capital drawn alone covers the lowercase too.
 // One em is 32 art pixels, which is one line of text. A drawing stands on its bottom edge, unless
 // it has one red pixel: then the bottom of that pixel's row is the baseline, and the rows below it
 // hang under the line (the descenders of g, j, p…). The red pixel itself isn't drawn.
@@ -108,19 +108,34 @@ const NAMED = {
 };
 
 const LOWER = 'lower_';
+const UPPER = 'upper_';
+const isCased = (name) => name.startsWith(LOWER) || name.startsWith(UPPER);
+
+// The character a drawing's name stands for.
+function charOf(name) {
+  if (name.startsWith(LOWER)) return name.slice(LOWER.length).toLowerCase();
+  if (name.startsWith(UPPER)) return name.slice(UPPER.length).toUpperCase();
+  return NAMED[name] ?? name;
+}
 
 async function readDrawings() {
   const files = (await fs.readdir(SRC, { recursive: true })).filter((f) => f.endsWith('.png')).sort();
   // macOS can store filenames decomposed (й as и + combining breve), so compare in NFC.
   const names = new Map(files.map((f) => [f, path.basename(f, '.png').normalize('NFC')]));
-  const lowercase = new Set([...names.values()].filter((n) => n.startsWith(LOWER)).map((n) => n.slice(LOWER.length)));
+  const chars = new Set([...names.values()].map(charOf));
+  const cased = new Set([...names.values()].filter(isCased).map((n) => charOf(n).toLowerCase()));
   const drawings = new Map();
   for (const file of files) {
     const name = names.get(file);
-    let char = NAMED[name] ?? name;
-    if (name.startsWith(LOWER)) char = name.slice(LOWER.length).toLowerCase();
-    else if (lowercase.has(char.toLowerCase())) char = char.toUpperCase();
+    const char = charOf(name);
     if ([...char].length !== 1) throw new Error(`${file}: name it after a single character, or add its name to NAMED`);
+    if (!isCased(name) && cased.has(char.toLowerCase())) {
+      throw new Error(`${file}: "${char}" is drawn case by case, so name this upper_${char.toLowerCase()}.png or lower_${char.toLowerCase()}.png`);
+    }
+    // The site's font draws both cases with the capital, so a letter without one would be missing.
+    if (name.startsWith(LOWER) && !chars.has(char.toUpperCase())) {
+      throw new Error(`${file}: draw its capital too, as upper_${char}.png`);
+    }
     if (drawings.has(char)) throw new Error(`${file}: "${char}" is already drawn by ${drawings.get(char).file}`);
     const png = PNG.sync.read(await fs.readFile(path.join(SRC, file)));
     drawings.set(char, { file, ...png, descent: descentOf(file, png), lowercase: name.startsWith(LOWER) });
