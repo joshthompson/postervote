@@ -1,7 +1,5 @@
 <script lang="ts">
-  import PixelText from '$lib/components/pixel/PixelText.svelte';
   import CountUp from '$lib/components/ui/CountUp.svelte';
-  import { i18n } from '$lib/i18n/index.svelte';
 
   // A row of big counting-up numbers with a label under each; every other one is red.
   // Tiles grow to fit their number and wrap onto more rows when they don't fit.
@@ -9,20 +7,12 @@
   type Stat = { label: string; value: number; decimals?: number; suffix?: string };
 
   let { stats }: { stats: Stat[] } = $props();
-
-  const final = (s: Stat) =>
-    i18n.num(s.value, { minimumFractionDigits: s.decimals ?? 0, maximumFractionDigits: s.decimals ?? 0 }) +
-    (s.suffix ?? '');
 </script>
 
 <section class="stats">
   {#each stats as stat, i}
     <div class="stat" style="--i:{i}">
-      <strong>
-        <!-- The final number, invisible, sizes the tile so it doesn't grow while counting up. -->
-        <span class="sizer" aria-hidden="true"><PixelText text={final(stat)} color="currentColor" /></span>
-        <span class="count"><CountUp value={stat.value} decimals={stat.decimals ?? 0} suffix={stat.suffix ?? ''} pixel /></span>
-      </strong>
+      <strong><CountUp value={stat.value} decimals={stat.decimals ?? 0} suffix={stat.suffix ?? ''} pixel /></strong>
       <span>{stat.label}</span>
     </div>
   {/each}
@@ -61,15 +51,6 @@
     height: 60px;
     margin-bottom: 10px;
     white-space: nowrap;
-  }
-  .sizer,
-  .count {
-    grid-area: 1 / 1;
-    display: flex;
-    align-items: flex-end;
-  }
-  .sizer {
-    visibility: hidden;
   }
   @media (max-width: 560px) {
     strong {

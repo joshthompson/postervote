@@ -175,6 +175,8 @@
   "←": {"advance":21,"height":24},
   "→": {"advance":23,"height":24},
   "−": {"advance":12,"height":15},
+  "≠": {"advance":16,"height":26},
   "≤": {"advance":16,"height":22},
-  "≥": {"advance":18,"height":23}
+  "≥": {"advance":18,"height":23},
+  "!=": {"advance":16,"height":26}
 }

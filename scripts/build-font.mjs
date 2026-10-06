@@ -4,8 +4,8 @@
 //
 //   remi-pop.woff2  the site's font: every dark, opaque pixel of a drawing becomes a square of ink
 //   remi-pop.ttf    the whole font with TrueType outlines, to install on a computer
-//   remi-pop.json   each character of the site's font: its advance and ink height in art pixels,
-//                   for layout code
+//   remi-pop.json   each character and ligature of the site's font: its advance and ink height in
+//                   art pixels, for layout code
 //
 // The site shows capitals only, so its font leaves out the lowercase drawings (lower_*.png) and
 // draws both cases with the capitals. That also keeps descenders out of it: browsers place the
@@ -21,6 +21,8 @@
 // hold, after a name in NAMED ("question.png"). A letter's drawing covers both its cases. To draw
 // them separately, name them "upper_<letter>.png" and "lower_<letter>.png" (macOS and Windows
 // can't hold "a.png" and "A.png" side by side). A capital drawn alone covers the lowercase too.
+// A ligature is a drawing of a character, with the characters it stands in for in LIGATURES:
+// "not_equals.png" draws ≠, and typing "!=" shows it too.
 // One em is 32 art pixels, which is one line of text. A drawing stands on its bottom edge, unless
 // it has one red pixel: then the bottom of that pixel's row is the baseline, and the rows below it
 // hang under the line (the descenders of g, j, p…). The red pixel itself isn't drawn.
@@ -96,6 +98,7 @@ const NAMED = {
   plus: '+',
   minus: '−',
   equals: '=',
+  not_equals: '≠',
   less_than: '<',
   greater_than: '>',
   less_than_or_equal_to: '≤',
@@ -105,6 +108,12 @@ const NAMED = {
   cross: '×',
   backtick: '`',
   forwardtick: '´'
+};
+
+// Characters typed together that the font draws as one, with the character whose drawing it uses.
+// They're standard ligatures (`liga`), which browsers, Figma and most apps apply by default.
+const LIGATURES = {
+  '!=': '≠'
 };
 
 const LOWER = 'lower_';
@@ -417,10 +426,20 @@ function glyphSet(drawings) {
     tallest = Math.max(tallest, drawing.height - drawing.descent);
     deepest = Math.max(deepest, drawing.descent);
   }
+  // A ligature swaps its characters' glyphs for the glyph of the character it draws.
+  const glyphOf = (c) => {
+    const index = glyphs.findIndex((g) => g.unicodes.includes(c.codePointAt(0)));
+    if (index < 0) throw new Error(`LIGATURES: "${c}" has no drawing`);
+    return index;
+  };
+  const ligatures = Object.entries(LIGATURES).map(([text, char]) => {
+    metrics[text] = metrics[char];
+    return { sub: [...text].map(glyphOf), by: glyphOf(char) };
+  });
   // The Windows ascent and descent leave room for drawings taller than a line and for
   // descenders, so Windows doesn't clip them.
   const winMetrics = { usWinAscent: Math.max(EM, tallest) * UNIT, usWinDescent: deepest * UNIT };
-  return { glyphs, metrics, tallest, winMetrics };
+  return { glyphs, ligatures, metrics, tallest, winMetrics };
 }
 
 const drawings = await readDrawings();
@@ -434,7 +453,9 @@ if (descending.length) {
 // Everything a font manager would see differently, so the version only moves when the font does.
 const fingerprint = crypto
   .createHash('sha256')
-  .update(JSON.stringify([full.glyphs.map((g) => [g.unicodes, g.advanceWidth, g.path.commands]), full.winMetrics, COPYRIGHT, LICENSE]))
+  .update(
+    JSON.stringify([full.glyphs.map((g) => [g.unicodes, g.advanceWidth, g.path.commands]), full.ligatures, full.winMetrics, COPYRIGHT, LICENSE])
+  )
   .digest('hex')
   .slice(0, 16);
 const previous = await fs
@@ -446,7 +467,7 @@ const build = previous.fingerprint === fingerprint ? previous.build : previous.b
 const version = `1.${String(build).padStart(3, '0')}`;
 
 /** A set of glyphs as an OpenType font with CFF outlines. */
-function makeFont({ glyphs, winMetrics }) {
+function makeFont({ glyphs, ligatures, winMetrics }) {
   const font = new opentype.Font({
     familyName: FAMILY,
     styleName: 'Regular',
@@ -469,6 +490,7 @@ function makeFont({ glyphs, winMetrics }) {
     // the baseline at its bottom, and descenders hang below it.
     tables: { os2: { version: 4, ...winMetrics } }
   });
+  for (const ligature of ligatures) font.substitution.addLigature('liga', ligature);
   // Unique per version, so the system doesn't mistake one version's cached copy for another's.
   for (const names of Object.values(font.names)) names.uniqueID = { en: `${FAMILY} Regular ${version}` };
   const otf = Buffer.from(font.toArrayBuffer());

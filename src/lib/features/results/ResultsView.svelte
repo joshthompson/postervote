@@ -1,5 +1,6 @@
 <script lang="ts">
   import { useQuery } from 'convex-svelte';
+  import { untrack } from 'svelte';
   import { pushState } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
@@ -58,7 +59,13 @@
   const archived = $derived(competition?.active === false);
   const missing = $derived(main.data === null);
   const error = $derived(main.error ?? posterList.error ?? counts.error);
-  const liveVotes = $derived(counts.data?.[segment]);
+  // While a newly picked group loads, the last group's snapshot stays on screen (keepPreviousData),
+  // and its live count has to stay with it: mixing them puts "today" off by the groups' difference.
+  let shownSegment = $state(untrack(() => segment));
+  $effect.pre(() => {
+    if (main.data !== undefined && !main.isStale) shownSegment = segment;
+  });
+  const liveVotes = $derived(counts.data?.[shownSegment]);
   // Votes are in but the first tally hasn't finished yet.
   const tallying = $derived(!!main.data && !main.data.snapshot && (liveVotes ?? 0) > 0);
   const data = $derived(
