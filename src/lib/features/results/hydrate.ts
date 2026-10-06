@@ -100,8 +100,8 @@ export function disagreements(posters: PosterInfo[], designers: Snapshot | null,
         _id: p._id,
         title: p.title,
         image: p.image,
-        designers: { rank: dp.rank, winRate: dp.winRate, matches: dp.matches },
-        others: { rank: op.rank, winRate: op.winRate, matches: op.matches },
+        designers: { rank: dp.rank, winRate: dp.winRate, matches: dp.matches, rating: dp.rating },
+        others: { rank: op.rank, winRate: op.winRate, matches: op.matches, rating: op.rating },
         // Positive: designers like it more.
         gap: dp.winRate - op.winRate
       };

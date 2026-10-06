@@ -5,7 +5,9 @@
   import { i18n } from '$lib/i18n/index.svelte';
   import { pct } from './format';
   import Board from './Board.svelte';
+  import GapSwarm from './GapSwarm.svelte';
   import RankRow from './RankRow.svelte';
+  import ScoreScatter from './ScoreScatter.svelte';
   import type { LinkTo, SplitPoster } from './types';
 
   // Posters designers and everyone else rate most differently, biggest gap first,
@@ -19,6 +21,9 @@
     { key: 'others', label: t.others, fill: 'var(--ink)' }
   ] as const);
 </script>
+
+<GapSwarm {posters} {linkTo} />
+<ScoreScatter {posters} {linkTo} />
 
 <Board title={t.versusTitle} note={t.versusNote}>
   {#each posters as p, i (p._id)}

@@ -218,6 +218,23 @@ export const en = {
     gap: (points: number) => `${num(points)} pts`,
     designersLove: 'designers love it',
     designersNotSold: 'designers aren’t sold',
+    gapChart: {
+      title: 'Who likes what',
+      note: 'Each poster sits by how much more one group picks it. The further out, the bigger the split.',
+      othersPrefer: 'Non-designers prefer',
+      designersPrefer: 'Designers prefer',
+      even: 'even'
+    },
+    scoreChart: {
+      title: 'Score against score',
+      note: (r: string) =>
+        `Each poster’s score with non-designers across, and with designers up. On the line, both groups agree. Correlation: ${r} (1 is full agreement, 0 none).`,
+      othersScore: 'Non-designers’ score',
+      designersScore: 'Designers’ score',
+      designersHigher: 'Designers rate it higher',
+      othersHigher: 'Non-designers rate it higher',
+      points: (n: number) => `${num(n)} pts`
+    },
     stats: {
       votes: 'Votes cast',
       voters: 'Voters',

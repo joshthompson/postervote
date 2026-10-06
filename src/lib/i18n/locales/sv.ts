@@ -211,6 +211,23 @@ export const sv: Messages = {
     gap: (points: number) => `${num(points)} p`,
     designersLove: 'designers älskar den',
     designersNotSold: 'designers är inte övertygade',
+    gapChart: {
+      title: 'Vem gillar vad',
+      note: 'Varje affisch hamnar efter hur mycket oftare den ena gruppen väljer den. Ju längre ut, desto större skillnad.',
+      othersPrefer: 'Andra föredrar',
+      designersPrefer: 'Designers föredrar',
+      even: 'lika'
+    },
+    scoreChart: {
+      title: 'Poäng mot poäng',
+      note: (r: string) =>
+        `Varje affischs poäng hos andra i sidled och hos designers på höjden. På linjen är grupperna överens. Korrelation: ${r} (1 är helt överens, 0 inget samband).`,
+      othersScore: 'Andras poäng',
+      designersScore: 'Designers poäng',
+      designersHigher: 'Designers ger högre poäng',
+      othersHigher: 'Andra ger högre poäng',
+      points: (n: number) => `${num(n)} p`
+    },
     stats: {
       votes: 'Lagda röster',
       voters: 'Röstare',
