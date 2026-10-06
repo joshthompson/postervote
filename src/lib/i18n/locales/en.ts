@@ -60,7 +60,7 @@ export const en = {
     votesOnPair: (n: number) => `${num(n)} vote${s(n)} on this pair`,
     voteFor: (title: string) => `Vote for ${title}`,
     yourPick: 'your pick',
-    ofVoters: 'of voters',
+    votes: (n: number) => `${num(n)} vote${s(n)}`,
     skip: 'Can’t decide? Skip →',
     next: 'Next →',
     pastVotes: 'Past Votes',

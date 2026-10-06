@@ -259,6 +259,7 @@
             {leaving}
             disabled={session.phase !== 'choose' || lookingBack}
             pct={result?.pct[i]}
+            votes={result?.votes[i]}
             winner={result ? result.pct[i] >= result.pct[1 - i] : false}
             shareHref={shareHref(poster)}
             onshare={(outcome) =>

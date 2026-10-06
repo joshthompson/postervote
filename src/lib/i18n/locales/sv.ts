@@ -59,7 +59,7 @@ export const sv: Messages = {
     votesOnPair: (n: number) => `${num(n)} ${plural(n, 'röst', 'röster')} på det här paret`,
     voteFor: (title: string) => `Rösta på ${title}`,
     yourPick: 'ditt val',
-    ofVoters: 'av rösterna',
+    votes: (n: number) => `${num(n)} ${plural(n, 'röst', 'röster')}`,
     skip: 'Kan inte välja? Hoppa över →',
     next: 'Nästa →',
     pastVotes: 'Tidigare röster',

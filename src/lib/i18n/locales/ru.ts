@@ -61,7 +61,7 @@ export const ru: Messages = {
     votesOnPair: (n: number) => `${num(n)} ${plural(n, 'голос', 'голоса', 'голосов')} в этой паре`,
     voteFor: (title: string) => `Голосовать за «${title}»`,
     yourPick: 'ваш выбор',
-    ofVoters: 'голосов',
+    votes: (n: number) => `${num(n)} ${plural(n, 'голос', 'голоса', 'голосов')}`,
     skip: 'Не можете выбрать? Пропустить →',
     next: 'Дальше →',
     pastVotes: 'Прошлые голоса',

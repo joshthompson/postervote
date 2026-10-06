@@ -20,6 +20,7 @@
     leaving,
     disabled,
     pct,
+    votes,
     winner,
     shareHref,
     onshare,
@@ -34,6 +35,8 @@
     disabled: boolean;
     /** This poster's share of the votes, once revealed. */
     pct?: number;
+    /** How many votes that share is. */
+    votes?: number;
     winner?: boolean;
     /** Its page, to share once the votes are revealed. */
     shareHref?: string;
@@ -59,8 +62,9 @@
     {#if pct !== undefined}
       <ResultSticker
         {pct}
+        votes={votes ?? 0}
         winner={!!winner}
-        label={chosen ? i18n.t.vote.yourPick : i18n.t.vote.ofVoters}
+        label={chosen ? i18n.t.vote.yourPick : undefined}
         side={side === 0 ? 'left' : 'right'}
       />
       {#if shareHref}
