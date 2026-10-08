@@ -120,6 +120,13 @@ Import Convex's generated code through the `$convex` alias, e.g. `import { api }
 
 Usage is counted with Mixpanel, from the browser, through `src/lib/services/analytics.ts`. It stores nothing on the device (no cookie, no localStorage, not the voter id), so there's no consent banner, but every page load counts as a new anonymous visitor. Only the live site sends events; `pnpm dev` and `pnpm preview` log them to the console as `[analytics]`. The events, their properties and the conventions they follow are in [AGENTS.md](AGENTS.md#analytics--mixpanel).
 
+## Admin pages
+
+Two hidden pages are just for us: nothing links to them, search engines are asked to skip them, their visits aren't tracked, and they have no sign-in.
+
+- `/admin/share` makes links and QR codes tagged with where they're handed out (see AGENTS.md).
+- `/admin/stats` shows a competition's votes per day and by hour of the day (designers and non-designers stacked), how many votes each voter casts, and the tally's state. Like the rankings, it reads the tallies (`stats.overview` in `convex/stats.ts`), never the votes, so it's up to 15 minutes behind.
+
 ## Deploying to GitHub Pages
 
 1. Create the GitHub repo and push: `git remote add origin … && git push -u origin main`

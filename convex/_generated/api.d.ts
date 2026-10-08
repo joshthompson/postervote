@@ -15,6 +15,7 @@ import type * as migrations from "../migrations.js";
 import type * as posters from "../posters.js";
 import type * as results from "../results.js";
 import type * as shared from "../shared.js";
+import type * as stats from "../stats.js";
 import type * as tally from "../tally.js";
 import type * as votes from "../votes.js";
 
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   posters: typeof posters;
   results: typeof results;
   shared: typeof shared;
+  stats: typeof stats;
   tally: typeof tally;
   votes: typeof votes;
 }>;
