@@ -1,0 +1,1 @@
+import{it as e,rt as t,z as n}from"./DqmOxf7N.js";var r=6e4,i=new class{#e=e(!1);get away(){return n(this.#e)}set away(e){t(this.#e,e,!0)}#t;constructor(){typeof document<`u`&&document.addEventListener(`visibilitychange`,()=>{clearTimeout(this.#t),document.visibilityState===`hidden`?this.#t=setTimeout(()=>this.away=!0,r):this.away=!1})}};export{i as t};
