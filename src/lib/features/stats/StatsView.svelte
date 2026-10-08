@@ -7,11 +7,13 @@
   import StatTiles from '$lib/features/results/StatTiles.svelte';
   import { visibility } from '$lib/state/visibility.svelte';
   import StackedBars from './StackedBars.svelte';
+  import VoteMap from './VoteMap.svelte';
   import { busiestHour, byDay, byDepth, byHourOfDay, depthSummary, GROUPS, splitOf, total } from './series';
 
   // Our numbers for a competition (the active one by default): votes per day and by hour of the
-  // day, how many votes each voter casts, and the tally's state. Read from the tallies, so the
-  // charts are up to 15 minutes behind; the vote count ticks live. English only, as it's just for us.
+  // day, where they come from, how many votes each voter casts, and the tally's state. Read from
+  // the tallies, so the charts are up to 15 minutes behind; the vote count ticks live. English
+  // only, as it's just for us.
 
   let slug = $state<string | undefined>(undefined);
   // Live queries pause while the tab has been in the background for a while.
@@ -114,6 +116,15 @@
     <ChartCard title="When people vote" note="Every vote so far by the hour it was cast, your time. Busiest: {peakSlot.title}.">
       <StackedBars bars={clock} {groups} unit="votes" height={200} labelWidth={30} />
     </ChartCard>
+
+    {#if data.countries.length}
+      <ChartCard
+        title="Where votes come from"
+        note="Votes by the country they were cast from, looked up in the voter's browser. {num(data.countries.length)} {data.countries.length === 1 ? 'country' : 'countries'} so far."
+      >
+        <VoteMap countries={data.countries} />
+      </ChartCard>
+    {/if}
 
     {#if depth.length && depthStats}
       <ChartCard

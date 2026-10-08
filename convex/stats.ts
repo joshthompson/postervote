@@ -10,9 +10,9 @@ import { find } from './competitions';
 const VOTER_CAP = 15_000;
 
 /**
- * A competition (by slug, or the active one): its votes per hour, the tally's running counts and
- * state, how many posters are in it, and how many voters cast each number of votes. null if
- * there's no such competition.
+ * A competition (by slug, or the active one): its votes per hour and per country, the tally's
+ * running counts and state, how many posters are in it, and how many voters cast each number of
+ * votes. null if there's no such competition.
  */
 export const overview = query({
   args: { competition: v.optional(v.string()) },
@@ -33,6 +33,18 @@ export const overview = query({
       .query('posters')
       .withIndex('by_competition_active', (q) => q.eq('competitionId', competitionId).eq('active', true))
       .collect();
+
+    // Located votes per country, by segment: a few rows per country.
+    const countryRows = await ctx.db
+      .query('countries')
+      .withIndex('by_code', (q) => q.eq('competitionId', competitionId))
+      .collect();
+    const byCode = new Map<string, { code: string; all: number; designers: number; others: number }>();
+    for (const row of countryRows) {
+      let c = byCode.get(row.code);
+      if (!c) byCode.set(row.code, (c = { code: row.code, all: 0, designers: 0, others: 0 }));
+      c[row.segment] = row.votes;
+    }
 
     // Voters per number of votes cast, by the group they said they're in (designers if they ever
     // said so, then others, else 'unknown': they voted before we asked).
@@ -60,6 +72,7 @@ export const overview = query({
         ? { lastRunAt: progress.lastRunAt, pending: progress.pending, scheduledFor: progress.scheduledFor, clearing: progress.clearing }
         : null,
       posters: posters.length,
+      countries: [...byCode.values()].sort((a, b) => b.all - a.all),
       depth
     };
   }

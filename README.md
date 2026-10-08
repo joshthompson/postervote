@@ -75,6 +75,7 @@ Use the lettering through `PixelText` (or `Logo` for the drifting header logo). 
 | `pnpm preview`           | Serve the production build locally                                             |
 | `pnpm check`             | Typecheck                                                                      |
 | `pnpm font`              | Rebuild the pixel font from the letter drawings                                |
+| `pnpm map`               | Rebuild the world map on `/admin/stats` (`src/lib/features/stats/world.json`) from Natural Earth's shapes |
 | `pnpm posters:sync`      | Sync posters to the dev deployment                                             |
 | `pnpm posters:sync:prod` | Sync posters to the prod deployment                                            |
 | `pnpm deploy:convex`     | Deploy Convex functions to prod                                                |
@@ -125,7 +126,7 @@ Usage is counted with Mixpanel, from the browser, through `src/lib/services/anal
 Two hidden pages are just for us: nothing links to them, search engines are asked to skip them, their visits aren't tracked, and they have no sign-in.
 
 - `/admin/share` makes links and QR codes tagged with where they're handed out (see AGENTS.md).
-- `/admin/stats` shows a competition's votes per day and by hour of the day (designers and non-designers stacked), how many votes each voter casts, and the tally's state. Like the rankings, it reads the tallies (`stats.overview` in `convex/stats.ts`), never the votes, so it's up to 15 minutes behind.
+- `/admin/stats` shows a competition's votes per day and by hour of the day (designers and non-designers stacked), a map of the countries they come from, how many votes each voter casts, and the tally's state. Like the rankings, it reads the tallies (`stats.overview` in `convex/stats.ts`), never the votes, so it's up to 15 minutes behind.
 
 ## Deploying to GitHub Pages
 
