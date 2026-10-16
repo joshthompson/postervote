@@ -1,0 +1,1 @@
+import{E as e,F as t,M as n,N as r,Q as i,et as a,ht as o,q as s,tt as c}from"./DC_Uu9G_.js";import"./xihTtKlq.js";var l=t(`<div class="message legible svelte-aop73g"><h2 class="svelte-aop73g"> </h2> <!></div>`);function u(t,u){var d=l(),f=i(d),p=a(f,!0),m=c(f,2);e(m,()=>u.children),o(d),s(()=>n(p,u.title)),r(t,d)}export{u as t};

@@ -1,1 +1,0 @@
-import{G as e,N as t,X as n,_ as r,i,j as a,mt as o,w as s}from"./DqmOxf7N.js";import"./xihTtKlq.js";var c=t(`<section class="card svelte-7d5xe5"><!></section>`);function l(t,l){let u=i(l,`delay`,3,0);var d=c(),f=n(d);s(f,()=>l.children),o(d),e(()=>r(d,`animation-delay: ${u()??``}s`)),a(t,d)}export{l as t};
