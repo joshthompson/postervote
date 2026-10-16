@@ -4,6 +4,10 @@
   // A field of hand-drawn pixel dots that fade in and out on their own and swell around the pointer.
   // Everything is drawn onto a low-res canvas with smoothing off, then upscaled with
   // `image-rendering: pixelated` so every dot keeps its crunchy pixel edges.
+  // `contained` fills the nearest positioned parent instead of the viewport; `interactive` off
+  // leaves the pointer out (e.g. in a video).
+
+  let { contained = false, interactive = true }: { contained?: boolean; interactive?: boolean } = $props();
 
   const SPRITE_URLS = Object.values(
     import.meta.glob('../../assets/dots/*.png', { eager: true, query: '?url', import: 'default' })
@@ -201,6 +205,7 @@
       build();
       frame = requestAnimationFrame(draw);
       resizeObserver.observe(field);
+      if (!interactive) return;
       window.addEventListener('pointermove', onMove);
       document.addEventListener('pointerleave', onLeave);
     });
@@ -215,7 +220,7 @@
   });
 </script>
 
-<div class="field" aria-hidden="true" bind:this={field}>
+<div class="field" class:contained aria-hidden="true" bind:this={field}>
   <canvas bind:this={canvas}></canvas>
 </div>
 
@@ -231,6 +236,11 @@
     z-index: 0;
     overflow: hidden;
     pointer-events: none;
+  }
+  .contained {
+    position: absolute;
+    inset: 0;
+    height: auto;
   }
   canvas {
     display: block;

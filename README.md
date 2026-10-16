@@ -75,6 +75,7 @@ Use the lettering through `PixelText` (or `Logo` for the drifting header logo). 
 | `pnpm preview`           | Serve the production build locally                                             |
 | `pnpm check`             | Typecheck                                                                      |
 | `pnpm font`              | Rebuild the pixel font from the letter drawings                                |
+| `pnpm video [slug]`      | Render a competition's winner video (the active one by default) to `videos/<slug>.mp4`: 1080 × 1920, 30 fps, H.264 with the music. Needs `pnpm dev` running and Google Chrome installed. `--name '…'` changes the name in the question, `--fps 60` the frame rate, `--out` the file, `--url` the site it renders from |
 | `pnpm map`               | Rebuild the world map on `/admin/stats` (`src/lib/features/stats/world.json`) from Natural Earth's shapes |
 | `pnpm posters:sync`      | Sync posters to the dev deployment                                             |
 | `pnpm posters:sync:prod` | Sync posters to the prod deployment                                            |
@@ -123,9 +124,10 @@ Usage is counted with Mixpanel, from the browser, through `src/lib/services/anal
 
 ## Admin pages
 
-Two hidden pages are just for us: nothing links to them, search engines are asked to skip them, their visits aren't tracked, and they have no sign-in.
+Three "hidden" pages are just for us: nothing links to them, search engines are asked to skip them, their visits aren't tracked, and they have no sign-in.
 
 - `/admin/share` makes links and QR codes tagged with where they're handed out (see AGENTS.md).
+- `/admin/video` previews a competition's winner video for Instagram: the logo, "What was the best poster of …?", most of its posters flying in and piling up, "The votes are in!", then third, second and the winner, all on the beat of the site's music (`src/lib/features/video/`, timings in `timeline.ts`). Space replays, M mutes, Esc closes. It shows the `pnpm video` command that makes the file.
 - `/admin/stats` shows a competition's votes per day and by hour of the day (designers and non-designers stacked), a map of the countries they come from, how many votes each voter casts, and the tally's state. Like the rankings, it reads the tallies (`stats.overview` in `convex/stats.ts`), never the votes, so it's up to 15 minutes behind.
 
 ## Deploying to GitHub Pages

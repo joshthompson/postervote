@@ -1,12 +1,13 @@
 import { storage } from './storage';
 
-// A tiny techno loop and vote sound effect, synthesised live with the Web Audio API.
+// A tiny techno loop and vote sound effect, synthesised with the Web Audio API: live on the
+// site, or offline into a file for the winner video (`renderMusic`).
 //
 // Browsers only allow audio after a user gesture, so nothing plays until `unlock()` runs
 // from the first click or key press. Muting suspends the whole AudioContext (music + effects),
 // and the choice is remembered.
 
-const BPM = 128;
+export const BPM = 128;
 const STEP = 60 / BPM / 4; // one 16th note, in seconds
 const LOOKAHEAD = 0.12; // how far ahead to schedule, in seconds
 const MUTE_KEY = 'muted';
@@ -23,36 +24,21 @@ const VOTE_CHORD = [69, 72, 76, 81];
 /** Semitones to shift the A-rooted chord shapes by for a given bar. */
 const barShift = (bar: number) => BASS_ROOTS[bar] - BASS_ROOTS[0];
 
+/** The loop's instruments, playing into `out` on any audio context, live or offline. */
+class Synth {
+  private music: GainNode;
+  private sfx: GainNode;
+  private echo: GainNode;
+  private noise: AudioBuffer;
 
-class Sound {
-  // Muted until the visitor turns the sound on.
-  muted = $state(storage.get(MUTE_KEY) !== '0');
-  /** True once `unlock()` has run, i.e. the visitor has clicked or pressed a key. */
-  unlocked = $state(false);
-
-  private ctx: AudioContext | null = null;
-  private music!: GainNode;
-  private sfx!: GainNode;
-  private echo!: GainNode;
-  private noise!: AudioBuffer;
-  private step = 0;
-  private nextTime = 0;
-  private timer: ReturnType<typeof setInterval> | undefined;
-
-  /** Create the audio graph and start the loop. Call from a user gesture. */
-  unlock() {
-    this.unlocked = true;
-    if (this.ctx) {
-      if (!this.muted && document.visibilityState === 'visible') this.ctx.resume();
-      return;
-    }
-    if (typeof AudioContext === 'undefined') return;
-    const ctx = (this.ctx = new AudioContext());
-
+  constructor(
+    private ctx: BaseAudioContext,
+    out: AudioNode
+  ) {
     const master = ctx.createDynamicsCompressor();
     master.threshold.value = -14;
     master.ratio.value = 4;
-    master.connect(ctx.destination);
+    master.connect(out);
 
     this.music = ctx.createGain();
     this.music.gain.value = 0.45;
@@ -76,31 +62,30 @@ class Sound {
     this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const data = this.noise.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-
-    this.nextTime = ctx.currentTime + 0.1;
-    this.timer = setInterval(() => this.schedule(), 25);
-    // Background tabs throttle timers, which would leave gaps in the loop; pause instead.
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') ctx.suspend();
-      else if (!this.muted) ctx.resume();
-    });
-    if (this.muted) ctx.suspend();
   }
 
-  toggle() {
-    this.muted = !this.muted;
-    storage.set(MUTE_KEY, this.muted ? '1' : '0');
-    if (this.muted) this.ctx?.suspend();
-    else this.unlock();
+  /** One 16th of the 4-bar (64-step) loop, at time `t`. */
+  playStep(step: number, t: number) {
+    const s = step % 16;
+    const bar = Math.floor(step / 16);
+
+    if (s % 4 === 0) this.kick(t);
+    if (s % 4 === 2) this.hat(t, 0.16, 0.14);
+    else this.hat(t, 0.03, 0.05);
+    if (s === 4 || s === 12) this.clap(t);
+    if (BASS_STEPS.includes(s)) {
+      const note = BASS_ROOTS[bar] + (BASS_OCTAVE_UP.has(s) ? 12 : 0);
+      this.bass(t, midi(note), step);
+    }
+    if (s === 3 || (s === 10 && bar % 2 === 1)) {
+      this.stab(t, STAB.map((n) => n + barShift(bar)), this.music, 0.12, 0.25);
+    }
   }
 
-  /** Laser zap up into a stab chord, matching the chord the loop is playing right now. */
-  vote() {
-    this.unlock(); // a keyboard vote can arrive before the layout's gesture listener runs
+  /** Laser zap up into a stab chord, matching the chord of `bar` (0–3) of the loop. */
+  vote(t: number, bar: number) {
     const ctx = this.ctx;
-    if (!ctx || this.muted) return;
-    const t = ctx.currentTime;
-    const chord = VOTE_CHORD.map((n) => n + barShift(this.barAt(t)));
+    const chord = VOTE_CHORD.map((n) => n + barShift(bar));
     const root = chord[0];
 
     const zap = ctx.createOscillator();
@@ -122,40 +107,8 @@ class Sound {
     this.hat(t + 0.12, 0.25, 0.3, this.sfx);
   }
 
-  private schedule() {
-    const ctx = this.ctx!;
-    while (this.nextTime < ctx.currentTime + LOOKAHEAD) {
-      this.playStep(this.step, this.nextTime);
-      this.nextTime += STEP;
-      this.step = (this.step + 1) % 64;
-    }
-  }
-
-  /** The loop's bar at time `t`, counting back from the steps already scheduled ahead of it. */
-  private barAt(t: number) {
-    const ahead = Math.max(0, Math.ceil((this.nextTime - t) / STEP));
-    return Math.floor((((this.step - ahead) % 64) + 64) % 64 / 16);
-  }
-
-  private playStep(step: number, t: number) {
-    const s = step % 16;
-    const bar = Math.floor(step / 16);
-
-    if (s % 4 === 0) this.kick(t);
-    if (s % 4 === 2) this.hat(t, 0.16, 0.14);
-    else this.hat(t, 0.03, 0.05);
-    if (s === 4 || s === 12) this.clap(t);
-    if (BASS_STEPS.includes(s)) {
-      const note = BASS_ROOTS[bar] + (BASS_OCTAVE_UP.has(s) ? 12 : 0);
-      this.bass(t, midi(note), step);
-    }
-    if (s === 3 || (s === 10 && bar % 2 === 1)) {
-      this.stab(t, STAB.map((n) => n + barShift(bar)), this.music, 0.12, 0.25);
-    }
-  }
-
   private envelope(t: number, attack: number, decay: number, peak: number) {
-    const g = this.ctx!.createGain();
+    const g = this.ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(peak, t + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
@@ -163,7 +116,7 @@ class Sound {
   }
 
   private kick(t: number) {
-    const ctx = this.ctx!;
+    const ctx = this.ctx;
     const osc = ctx.createOscillator();
     osc.frequency.setValueAtTime(150, t);
     osc.frequency.exponentialRampToValueAtTime(45, t + 0.12);
@@ -174,7 +127,7 @@ class Sound {
   }
 
   private hat(t: number, decay: number, peak: number, out = this.music) {
-    const ctx = this.ctx!;
+    const ctx = this.ctx;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
     const hp = ctx.createBiquadFilter();
@@ -187,7 +140,7 @@ class Sound {
   }
 
   private clap(t: number) {
-    const ctx = this.ctx!;
+    const ctx = this.ctx;
     const bp = ctx.createBiquadFilter();
     bp.type = 'bandpass';
     bp.frequency.value = 1400;
@@ -205,7 +158,7 @@ class Sound {
   }
 
   private bass(t: number, freq: number, step: number) {
-    const ctx = this.ctx!;
+    const ctx = this.ctx;
     const osc = ctx.createOscillator();
     osc.type = 'sawtooth';
     osc.frequency.value = freq;
@@ -223,7 +176,7 @@ class Sound {
   }
 
   private stab(t: number, notes: number[], out: GainNode, peak: number, decay: number) {
-    const ctx = this.ctx!;
+    const ctx = this.ctx;
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
     lp.frequency.setValueAtTime(3500, t);
@@ -244,4 +197,92 @@ class Sound {
   }
 }
 
+class Sound {
+  // Muted until the visitor turns the sound on.
+  muted = $state(storage.get(MUTE_KEY) !== '0');
+  /** True once `unlock()` has run, i.e. the visitor has clicked or pressed a key. */
+  unlocked = $state(false);
+
+  private ctx: AudioContext | null = null;
+  private synth!: Synth;
+  private step = 0;
+  private nextTime = 0;
+  private timer: ReturnType<typeof setInterval> | undefined;
+
+  /** Create the audio graph and start the loop. Call from a user gesture. */
+  unlock() {
+    this.unlocked = true;
+    if (this.ctx) {
+      if (!this.muted && document.visibilityState === 'visible') this.ctx.resume();
+      return;
+    }
+    if (typeof AudioContext === 'undefined') return;
+    const ctx = (this.ctx = new AudioContext());
+    this.synth = new Synth(ctx, ctx.destination);
+
+    this.nextTime = ctx.currentTime + 0.1;
+    this.timer = setInterval(() => this.schedule(), 25);
+    // Background tabs throttle timers, which would leave gaps in the loop; pause instead.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') ctx.suspend();
+      else if (!this.muted) ctx.resume();
+    });
+    if (this.muted) ctx.suspend();
+  }
+
+  toggle() {
+    this.muted = !this.muted;
+    storage.set(MUTE_KEY, this.muted ? '1' : '0');
+    if (this.muted) this.ctx?.suspend();
+    else this.unlock();
+  }
+
+  /** Start the loop again from its first beat, `lead` seconds from now (e.g. in time with a video). */
+  restart(lead = 0.1) {
+    this.unlock();
+    if (!this.ctx) return;
+    this.step = 0;
+    this.nextTime = this.ctx.currentTime + lead;
+  }
+
+  /** Laser zap up into a stab chord, matching the chord the loop is playing right now. */
+  vote() {
+    this.unlock(); // a keyboard vote can arrive before the layout's gesture listener runs
+    const ctx = this.ctx;
+    if (!ctx || this.muted) return;
+    this.synth.vote(ctx.currentTime, this.barAt(ctx.currentTime));
+  }
+
+  private schedule() {
+    const ctx = this.ctx!;
+    while (this.nextTime < ctx.currentTime + LOOKAHEAD) {
+      this.synth.playStep(this.step, this.nextTime);
+      this.nextTime += STEP;
+      this.step = (this.step + 1) % 64;
+    }
+  }
+
+  /** The loop's bar at time `t`, counting back from the steps already scheduled ahead of it. */
+  private barAt(t: number) {
+    const ahead = Math.max(0, Math.ceil((this.nextTime - t) / STEP));
+    return Math.floor((((this.step - ahead) % 64) + 64) % 64 / 16);
+  }
+}
+
 export const sound = new Sound();
+
+/**
+ * The loop from its first beat for `seconds`, with the vote effect at each of `zaps` (seconds),
+ * rendered offline (faster than real time, no gesture needed). It fades out over the last second.
+ */
+export function renderMusic(seconds: number, zaps: number[], sampleRate = 48_000) {
+  const ctx = new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate);
+  const fade = ctx.createGain();
+  fade.gain.setValueAtTime(1, Math.max(0, seconds - 1));
+  fade.gain.linearRampToValueAtTime(0, seconds);
+  fade.connect(ctx.destination);
+  const synth = new Synth(ctx, fade);
+  for (let step = 0; step * STEP < seconds; step++) synth.playStep(step % 64, step * STEP);
+  for (const t of zaps) synth.vote(t, Math.floor(t / STEP / 16) % 4);
+  return ctx.startRendering();
+}
