@@ -1,27 +1,28 @@
 <script lang="ts">
-  import { useQuery } from 'convex-svelte';
-  import { api } from '$convex/api';
   import Loader from '$lib/components/ui/Loader.svelte';
   import Pill from '$lib/components/ui/Pill.svelte';
   import ChartCard from '$lib/features/results/ChartCard.svelte';
   import StatTiles from '$lib/features/results/StatTiles.svelte';
+  import { isArchived } from '$lib/features/collections/archives.svelte';
+  import { useCollections, useLiveCounts, useStats } from '$lib/features/collections/data.svelte';
   import { visibility } from '$lib/state/visibility.svelte';
   import StackedBars from './StackedBars.svelte';
   import VoteMap from './VoteMap.svelte';
   import { busiestHour, byDay, byDepth, byHourOfDay, depthSummary, GROUPS, splitOf, total } from './series';
 
-  // Our numbers for a competition (the active one by default): votes per day and by hour of the
+  // Our numbers for a collection (the active one by default): votes per day and by hour of the
   // day, where they come from, how many votes each voter casts, and the tally's state. Read from
-  // the tallies, so the charts are up to 15 minutes behind; the vote count ticks live. English
-  // only, as it's just for us.
+  // the tallies, so the charts are up to 15 minutes behind (or, for an archived collection, from its
+  // archive); the vote count ticks live. English only, as it's just for us.
 
   let slug = $state<string | undefined>(undefined);
-  // Live queries pause while the tab has been in the background for a while.
-  const live = <A,>(args: A) => (visibility.away ? ('skip' as const) : args);
+  // Live queries pause while the tab has been in the background for a while (an archive never changes).
+  const live = <A,>(args: A) => (visibility.away && !isArchived(slug) ? ('skip' as const) : args);
 
-  const stats = useQuery(api.stats.overview, () => live({ competition: slug }), { keepPreviousData: true });
-  const counts = useQuery(api.results.live, () => live({ competition: slug }), { keepPreviousData: true });
-  const archived = useQuery(api.competitions.archived, {});
+  const stats = useStats(() => live({ collection: slug }), { keepPreviousData: true });
+  const counts = useLiveCounts(() => live({ collection: slug }), { keepPreviousData: true });
+  const collections = useCollections();
+  const past = $derived(collections.data.filter((c) => !c.active));
 
   // Ticks the "minutes ago" along.
   let now = $state(Date.now());
@@ -32,7 +33,7 @@
 
   const data = $derived(stats.data);
   const hours = $derived(data?.hours ?? []);
-  const active = $derived(data?.competition.active ?? false);
+  const active = $derived(data?.collection.active ?? false);
   const days = $derived(byDay(hours, active ? now : 0));
   const clock = $derived(byHourOfDay(hours));
   const depth = $derived(data?.depth ? byDepth(data.depth) : []);
@@ -76,10 +77,10 @@
   }
 </script>
 
-{#if archived.data?.length}
-  <nav class="picker" aria-label="Competition">
+{#if past.length}
+  <nav class="picker" aria-label="Collection">
     <Pill variant={slug ? 'outline' : 'ink'} pressed={!slug} onclick={() => (slug = undefined)}>Current</Pill>
-    {#each archived.data as c (c.slug)}
+    {#each past as c (c.slug)}
       <Pill variant={slug === c.slug ? 'ink' : 'outline'} pressed={slug === c.slug} onclick={() => (slug = c.slug)}>{c.title}</Pill>
     {/each}
   </nav>
@@ -90,10 +91,10 @@
 {:else if data === undefined}
   <Loader />
 {:else if data === null}
-  <p class="message">No competition yet. Sync some posters first.</p>
+  <p class="message">No collection yet. Sync some posters first.</p>
 {:else}
   <p class="heading">
-    <strong>{data.competition.title}</strong>
+    <strong>{data.collection.title}</strong>
     {#if data.tally}
       · {data.tally.clearing ? 'Recounting' : `Tallied ${ago(data.tally.lastRunAt)}`}
       {#if waiting}· {num(waiting)} {waiting === 1 ? 'vote' : 'votes'} waiting{/if}

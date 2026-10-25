@@ -32,7 +32,7 @@ Nothing is stored on the device: `disable_persistence` keeps the visitor's id ou
 - Property names are snake_case, enum values are lowercase snake_case strings, and booleans start with `is_`.
 - Numbers are sent as numbers. Leave a property out when it doesn't apply; `track` drops `undefined` and `null`.
 - A property name means the same thing on every event:
-  - `competition`: the competition's slug
+  - `collection`: the collection's slug (it was `competition` until the rename to collections; break down older data by that)
   - `poster_id` and `poster_title`: the poster the action is about (on votes, the pick)
   - `placement`: where on the site the control is
   - `method`: `click` or `keyboard`
@@ -46,17 +46,17 @@ Nothing is stored on the device: `disable_persistence` keeps the visitor's id ou
 
 | Event | Fires when | Properties | Where |
 |---|---|---|---|
-| `$mp_web_page_view` | The first page, and every SvelteKit navigation (opening a poster from the rankings isn't one) | `route` (the route id, e.g. `/poster/[competition]/[name]`), `competition`, plus Mixpanel's URL and UTM properties | `routes/+layout.svelte` |
+| `$mp_web_page_view` | The first page, and every SvelteKit navigation (opening a poster from the rankings isn't one) | `route` (the route id, e.g. `/poster/[collection]/[name]`), `collection`, plus Mixpanel's URL and UTM properties | `routes/+layout.svelte` |
 | `voting_started` | The start button, or answering the designer question on a first visit | `trigger`: `start_button` / `designer_answer` | `features/vote/VoteStage.svelte` |
 | `designer_question_answered` | Yes/No on "Are you a designer?" (the answer is `is_designer`) | `placement`: `vote_intro` / `settings` | `VoteStage.svelte`, `routes/settings/+page.svelte` |
-| `poster_voted` | A vote is saved in Convex | `competition`, `poster_id`, `poster_title`, `opponent_poster_id`, `opponent_poster_title`, `chosen_side` (`left` / `right`; top/bottom when stacked), `method`, `crowd_share` (0–100: how much of the pair's vote agrees), `pair_votes`, `crowd_streak`, `votes_this_visit`, `posters_seen` and `posters_total` (until they've seen every poster) | `VoteStage.svelte` |
+| `poster_voted` | A vote is saved in Convex | `collection`, `poster_id`, `poster_title`, `opponent_poster_id`, `opponent_poster_title`, `chosen_side` (`left` / `right`; top/bottom when stacked), `method`, `crowd_share` (0–100: how much of the pair's vote agrees), `pair_votes`, `crowd_streak`, `votes_this_visit`, `posters_seen` and `posters_total` (until they've seen every poster) | `VoteStage.svelte` |
 | `poster_vote_failed` | Saving a vote fails, or gets no answer within 8 seconds | as `poster_voted`, up to `method`, plus `failure` (`failed` / `timeout`) and `is_connected` (Convex's WebSocket, at the time) | `VoteStage.svelte` |
-| `pair_skipped` | The skip button | `competition`, `poster_ids`, `poster_titles` (lists, in screen order), `votes_this_visit` | `VoteStage.svelte` |
+| `pair_skipped` | The skip button | `collection`, `poster_ids`, `poster_titles` (lists, in screen order), `votes_this_visit` | `VoteStage.svelte` |
 | `reveal_dismissed` | "Next →", or Enter or Space, during the vote reveal (not the automatic advance) | `method`, `is_autoplay_paused` | `VoteStage.svelte` |
 | `past_votes_opened` | "Past Votes", beside autoplay under the vote reveal or beside skip while choosing, to look back at this visit's votes from the newest (no voting, and autoplay stops, while they look) | `placement`: `vote_reveal` / `vote_pair`, `votes_this_visit` | `VoteStage.svelte` |
 | `past_votes_closed` | "Continue voting!" (or Enter or Space) while looking back: on to the next pair from a reveal, or back to the pair they were choosing between | `method`, `votes_viewed` (old votes looked at) | `VoteStage.svelte` |
-| `all_posters_seen` | The "you've seen every poster" message appears | `competition`, `posters_total`, `votes_this_visit` | `VoteStage.svelte` |
-| `poster_shared` | A poster share finishes | `competition`, `poster_id`, `poster_title`, `placement`: `vote_reveal` / `past_votes` / `rankings_modal` / `poster_page`, `outcome` | `VoteStage.svelte`, `features/results/ResultsView.svelte`, `features/results/PosterView.svelte` |
+| `all_posters_seen` | The "you've seen every poster" message appears | `collection`, `posters_total`, `votes_this_visit` | `VoteStage.svelte` |
+| `poster_shared` | A poster share finishes | `collection`, `poster_id`, `poster_title`, `placement`: `vote_reveal` / `past_votes` / `rankings_modal` / `poster_page`, `outcome` | `VoteStage.svelte`, `features/results/ResultsView.svelte`, `features/results/PosterView.svelte` |
 | `site_shared` | The corner share button finishes | `outcome` | `features/share/SiteShareButton.svelte` |
 | `coffee_link_clicked` | Buy Me a Coffee | `placement`: `corner_button` / `about_page` | `components/layout/CoffeeButton.svelte` |
 | `font_downloaded` | The download button in the About page's Remi Pop section | none | `routes/about/+page.svelte` |
@@ -65,9 +65,9 @@ Nothing is stored on the device: `disable_persistence` keeps the visitor's id ou
 | `sound_toggled` | The mute button (the new setting is `is_sound_muted`) | none | `components/layout/MuteButton.svelte` |
 | `autoplay_toggled` | The ▶ / ❚❚ button beside "Next →" under the vote reveal, whose border counts down to the next pair | `is_autoplay_paused` (the new setting; it lasts the visit) | `VoteStage.svelte` |
 | `vote_history_cleared` | "Clear" in Settings, once confirmed (sent by beacon, since the page reloads) | `vote_count` | `features/settings/VoteHistory.svelte` |
-| `rankings_view_changed` | A rankings filter pill | `competition`, `view`, `previous_view` (`all` / `designers` / `others` / `disagree`) | `ResultsView.svelte` |
-| `poster_details_opened` | A poster clicked in the rankings, opening the modal (a modifier-click opens its page in a new tab instead) | `competition`, `poster_id`, `poster_title`, `poster_rank`, `view`, `placement`: `podium` / `leaderboard` / `local_picks` / `disagreements` | `ResultsView.svelte` |
-| `nav_link_clicked` | The logo, the header shortcut, a menu link, "See rankings" on the vote screen's messages, or a button on the 404 or error page | `destination`: `vote` / `rankings` / `about` / `settings` / `past_results`, `placement`: `logo` / `header_pill` / `menu` / `vote_message` / `error_page`, `competition` (for past results) | `SiteHeader.svelte`, `NavPill.svelte`, `SiteMenu.svelte`, `VoteStage.svelte`, `routes/+error.svelte` |
+| `rankings_view_changed` | A rankings filter pill | `collection`, `view`, `previous_view` (`all` / `designers` / `others` / `disagree`) | `ResultsView.svelte` |
+| `poster_details_opened` | A poster clicked in the rankings, opening the modal (a modifier-click opens its page in a new tab instead) | `collection`, `poster_id`, `poster_title`, `poster_rank`, `view`, `placement`: `podium` / `leaderboard` / `local_picks` / `disagreements` | `ResultsView.svelte` |
+| `nav_link_clicked` | The logo, the header shortcut, a menu link, "See rankings" on the vote screen's messages, a button on the 404 or error page, or a collection (or the live one's "Vote →") on `/collections` | `destination`: `vote` / `rankings` / `collections` / `collection` / `about` / `settings` (`past_results` before the collections page), `placement`: `logo` / `header_pill` / `menu` / `vote_message` / `error_page` / `collections_page`, `collection` (on `/collections`) | `SiteHeader.svelte`, `NavPill.svelte`, `SiteMenu.svelte`, `VoteStage.svelte`, `routes/+error.svelte`, `features/collections/CollectionsView.svelte` |
 
 ### Adding an event
 
@@ -87,7 +87,7 @@ Links we hand out carry UTM parameters saying where they were handed out. Mixpan
 | Posts in design communities | the community, e.g. `telegram_<group>` | `community` | |
 | The site's share buttons (added automatically) | `site_button` / `poster_button` | `share` | |
 
-- `utm_campaign` is optional, e.g. a competition's slug.
+- `utm_campaign` is optional, e.g. a collection's slug.
 - Values are lowercase snake_case. Never change one once its link is out, and keep a list of the links handed out.
 - Make links and QR codes (PNG or SVG) on `/admin/share`. It's hidden: nothing links to it, it asks search engines to skip it, its page views aren't tracked, and it has no sign-in.
 - `withUtm()` and `SITE` are in `src/lib/features/share/links.ts`; the share buttons use them too.

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Optimise every image in ./posters into ./static/posters/<slug> (as JPEG) and register them in Convex
-// as the posters of the competition in posters/competition.json ({ "slug": "…", "title": "…" }).
-// That competition becomes the active one; any other is archived, with its images left in place.
+// as the posters of the collection in posters/collection.json ({ "slug": "…", "title": "…" }).
 //
-//   pnpm posters:sync        → dev deployment
+//   pnpm posters:sync        → dev deployment: updates the live collection's posters
 //   pnpm posters:sync:prod   → production deployment (uses CONVEX_DEPLOY_KEY from .env.production)
+//   --publish                → a new slug becomes the live collection, closing voting on the one
+//                              before (its images stay in place). `pnpm collections publish` adds it.
 //   --images-only            → just optimise images (run before every build)
 //
 // Titles come from posters/titles.json ({ "001.jpg": "My Title" }), falling back to the filename.
@@ -19,17 +20,18 @@ import os from 'node:os';
 const run = promisify(execFile);
 const root = path.resolve(import.meta.dirname, '..');
 const SRC = path.join(root, 'posters');
-const competition = JSON.parse(await fs.readFile(path.join(SRC, 'competition.json'), 'utf8'));
-if (!/^[a-z0-9-]+$/.test(competition.slug ?? '') || !competition.title) {
-  console.error('posters/competition.json needs a "slug" (a-z, 0-9, -) and a "title"');
+const collection = JSON.parse(await fs.readFile(path.join(SRC, 'collection.json'), 'utf8'));
+if (!/^[a-z0-9-]+$/.test(collection.slug ?? '') || !collection.title) {
+  console.error('posters/collection.json needs a "slug" (a-z, 0-9, -) and a "title"');
   process.exit(1);
 }
-const OUT = path.join(root, 'static', 'posters', competition.slug);
+const OUT = path.join(root, 'static', 'posters', collection.slug);
 const MAX_SIZE = 1200;
 const IMAGE = /\.(heic|heif|jpe?g|png|webp|avif)$/i;
 const WEB_SAFE = /\.(jpe?g|png|webp|avif)$/i;
 const prod = process.argv.includes('--prod');
 const imagesOnly = process.argv.includes('--images-only');
+const publish = process.argv.includes('--publish');
 const hasSips = os.platform() === 'darwin';
 
 async function readTitles() {
@@ -100,6 +102,13 @@ async function pool(items, size, fn) {
   return results;
 }
 
+// An archived collection's images are its archive's; a new collection needs a new slug.
+const archived = await fs.stat(path.join(root, 'archives', collection.slug)).then(() => true, () => false);
+if (archived && !imagesOnly) {
+  console.error(`“${collection.slug}” has been archived (archives/${collection.slug}). Give posters/collection.json a new slug.`);
+  process.exit(1);
+}
+
 const files = (await fs.readdir(SRC).catch(() => [])).filter((f) => IMAGE.test(f)).sort();
 if (!files.length) {
   console.error('No images found in ./posters');
@@ -122,17 +131,24 @@ const titles = await readTitles();
 const posters = converted.map(({ file, outName }) => ({
   key: file,
   title: titles[file] ?? prettify(file),
-  image: `posters/${competition.slug}/${outName}`
+  image: `posters/${collection.slug}/${outName}`
 }));
 
-console.log(`Syncing “${competition.title}” to Convex (${prod ? 'prod' : 'dev'})…`);
+console.log(`${publish ? 'Publishing' : 'Syncing'} “${collection.title}” to Convex (${prod ? 'prod' : 'dev'})…`);
 const args = [
   'convex',
   'run',
   'posters:sync',
-  JSON.stringify({ competition: { slug: competition.slug, title: competition.title }, posters })
+  JSON.stringify({ collection: { slug: collection.slug, title: collection.title }, posters, publish })
 ];
 if (prod) args.push('--prod');
-const { stdout } = await run('npx', args, { cwd: root, maxBuffer: 10 * 1024 * 1024 });
+let stdout;
+try {
+  ({ stdout } = await run('npx', args, { cwd: root, maxBuffer: 10 * 1024 * 1024 }));
+} catch (e) {
+  // Convex's own message (e.g. that publishing needs --publish) is the useful part.
+  console.error((e.stderr || e.message).trim());
+  process.exit(1);
+}
 console.log(stdout.trim());
 if (prod) console.log('Note: rebuild & redeploy the site (pnpm deploy:web) so new images are published.');

@@ -1,11 +1,10 @@
 <script lang="ts">
-  import { useQuery } from 'convex-svelte';
   import type { Snippet } from 'svelte';
-  import { api } from '$convex/api';
   import PixelText from '$lib/components/pixel/PixelText.svelte';
   import IconButton from '$lib/components/ui/IconButton.svelte';
   import Loader from '$lib/components/ui/Loader.svelte';
   import Meter from '$lib/components/ui/Meter.svelte';
+  import { usePosterDetail } from '$lib/features/collections/data.svelte';
   import ShareButton from '$lib/features/share/ShareButton.svelte';
   import type { ShareOutcome } from '$lib/features/share/share.svelte';
   import { i18n } from '$lib/i18n/index.svelte';
@@ -25,6 +24,7 @@
   let {
     poster,
     segment,
+    collection,
     posterById,
     shareHref,
     onshare,
@@ -33,7 +33,9 @@
   }: {
     poster: RankedPoster;
     segment: Segment;
-    /** The competition's posters, to name the opponents. */
+    /** Its collection's slug; undefined for the active one. */
+    collection?: string;
+    /** The collection's posters, to name the opponents. */
     posterById: Map<PosterInfo['_id'], PosterInfo>;
     shareHref?: string;
     onshare?: (outcome: ShareOutcome) => void;
@@ -45,7 +47,7 @@
   const SHOWN_OPPONENTS = 8;
 
   const t = $derived(i18n.t.results);
-  const query = useQuery(api.results.poster, () => ({ id: poster._id, segment }));
+  const query = usePosterDetail(() => ({ id: poster._id, segment, collection }));
   const detail = $derived({ data: query.data && hydrate(query.data, posterById) });
 
   const rate = (r: { wins: number; losses: number }) => (r.wins + r.losses ? r.wins / (r.wins + r.losses) : null);

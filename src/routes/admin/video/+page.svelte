@@ -3,7 +3,7 @@
   import PageTitle from '$lib/components/ui/PageTitle.svelte';
   import VideoStudio from '$lib/features/video/VideoStudio.svelte';
 
-  // A hidden page that plays a competition's winner video, to screen-record for Instagram. Like
+  // A hidden page that plays a collection's winner video, to screen-record for Instagram. Like
   // /admin/share, nothing links here, search engines are asked to skip it, its visits aren't
   // counted (see +layout.svelte), and there's no sign-in.
 </script>

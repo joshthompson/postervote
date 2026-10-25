@@ -38,14 +38,15 @@
   // Each poster's page, to share after voting on it.
   const names = $derived(posterNames(list));
   const shareHref = (p: Poster) => (posters.slug ? posterHref(posters.slug, names.get(p._id)!) : undefined);
-  // The competition and a poster, as the analytics events name them.
-  const competition = $derived(posters.slug ?? undefined);
-  const about = (p: Poster) => ({ competition, poster_id: p._id, poster_title: p.title });
+  // The collection and a poster, as the analytics events name them.
+  const collection = $derived(posters.slug ?? undefined);
+  const about = (p: Poster) => ({ collection, poster_id: p._id, poster_title: p.title });
 
   const session = new VoteSession({
     posters: () => list,
     removed: () => posters.removed,
-    collection: () => posters.competitionId,
+    collection: () => posters.collectionId,
+    formerCollection: () => posters.formerId,
     cast: async (winner, loser) =>
       client.mutation(api.votes.cast, {
         winnerId: winner._id,
@@ -68,7 +69,7 @@
   // This pair showed them the last of the posters they hadn't seen.
   $effect(() => {
     if (session.phase === 'seenAll') {
-      untrack(() => track('all_posters_seen', { competition, posters_total: list.length, votes_this_visit: votes }));
+      untrack(() => track('all_posters_seen', { collection, posters_total: list.length, votes_this_visit: votes }));
     }
   });
 
@@ -118,7 +119,7 @@
     if (!session.canVote) return;
     const pair = session.pair!;
     track('pair_skipped', {
-      competition,
+      collection,
       poster_ids: pair.map((p) => p._id),
       poster_titles: pair.map((p) => p.title),
       votes_this_visit: votes

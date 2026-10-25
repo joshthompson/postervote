@@ -23,12 +23,14 @@ const EXIT_MS = 700;
 const CAST_TIMEOUT_MS = 8000;
 
 type Source = {
-  /** The competition's posters (reactive). */
+  /** The collection's posters (reactive). */
   posters: () => Poster[];
   /** Ids of posters taken out of it, whose pairs are skipped (reactive). */
   removed: () => string[];
-  /** The collection (competition) they belong to (reactive): undefined until known, null if none. */
+  /** The collection they belong to (reactive): undefined until known, null if none. */
   collection: () => string | null | undefined;
+  /** The id it had as a competition, if it was one, which their place may still be kept under. */
+  formerCollection: () => string | null | undefined;
   /** Record a vote; resolves to both posters' vote counts on this pair. */
   cast: (winner: Poster, loser: Poster) => Promise<{ winnerVotes: number; loserVotes: number }>;
 };
@@ -242,7 +244,7 @@ export class VoteSession {
   #next(from?: number): Next | null {
     const collection = this.#source.collection();
     if (!collection) return null;
-    const { seed, index } = this.#progress.get(collection);
+    const { seed, index } = this.#progress.get(collection, this.#source.formerCollection());
     const posters = this.#source.posters();
     const order = pairOrder(posters, seed, this.#source.removed());
     const start = from ?? index;

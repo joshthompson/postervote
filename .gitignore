@@ -10,7 +10,7 @@ node_modules
 # Original (full-size) poster files; optimised copies live in static/posters/<slug>
 /posters/*
 !/posters/titles.json
-!/posters/competition.json
+!/posters/collection.json
 
 # Local anonymous Convex backend state
 /.convex

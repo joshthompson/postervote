@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import Logo from '$lib/components/pixel/Logo.svelte';
   import { widestWord } from '$lib/components/pixel/glyphs';
+  import { SITE } from '$lib/features/share/links';
   import type { PosterInfo } from '$lib/services/posters.svelte';
   import { sound } from '$lib/services/sound.svelte';
   import { posterSrc } from '$lib/utils/images';
@@ -9,9 +10,10 @@
   import TopThree from './TopThree.svelte';
   import { AT, BEAT_MS, CUES, fitPx, HEIGHT, WIDTH, type Spawn } from './timeline';
 
-  // One run of the winner video, drawn over the stage's polka dots: the logo, the question,
-  // posters flying through, "the votes are in!", and the top three. It keeps its own clock from
-  // `startAt` (a performance.now() time, when the music restarts), so every part lands on the beat.
+  // The winner video, drawn over the stage's polka dots: the logo, the question, posters flying
+  // through, "the votes are in!", the top three, and the site's address. It keeps its own clock from
+  // `startAt` (a performance.now() time, when the music restarts), so every part lands on the beat,
+  // and goes round again after `AT.end`: the end clears to the bare stage it starts on.
   // `sfx` plays the vote effect on the cues; off when the effects are rendered into the music.
 
   type Finalist = Pick<PosterInfo, '_id' | 'title' | 'image'>;
@@ -31,10 +33,14 @@
 
   onMount(() => {
     let frame = 0;
-    // Cues already passed when the reel starts (there are none) or skipped by a stalled tab stay silent.
+    // Cues skipped by a stalled tab stay silent. Each time round starts them over.
     let cue = 0;
+    let lap = 0;
     const tick = () => {
-      beat = (performance.now() - startAt) / BEAT_MS;
+      const elapsed = (performance.now() - startAt) / BEAT_MS;
+      const thisLap = Math.max(0, Math.floor(elapsed / AT.end));
+      if (thisLap !== lap) [lap, cue] = [thisLap, 0];
+      beat = elapsed - lap * AT.end;
       for (; cue < CUES.length && beat >= CUES[cue]; cue++) if (sfx && beat < CUES[cue] + 0.5) sound.vote();
       frame = requestAnimationFrame(tick);
     };
@@ -58,6 +64,7 @@
     return `--ox: ${(dx / len) * 800}px; --oy: ${(dy / len) * 900}px`;
   }
 
+  const site = new URL(SITE).host;
   const fmt = (n: number) => n.toLocaleString('en-GB');
   // The count races up while the posters fly, faster and faster. Every frame, so it runs smoothly.
   const counted = $derived.by(() => {
@@ -79,8 +86,8 @@
     </div>
   {/if}
 
-  {#if now >= AT.logoSmall + 0.5}
-    <div class="brand"><Logo px={2} /></div>
+  {#if now >= AT.logoSmall + 0.5 && now < AT.outroOut + 1}
+    <div class="brand" class:out={now >= AT.outroOut}><Logo px={2} /></div>
   {/if}
 
   {#if now >= AT.question && now < AT.questionOut + 1}
@@ -123,12 +130,16 @@
     </div>
   {/if}
 
-  {#if now >= AT.third}
-    <TopThree {top} {now} />
+  {#if now >= AT.third && now < AT.outro + 1}
+    <div class="finale" class:leaving={now >= AT.outro}><TopThree {top} {now} /></div>
   {/if}
 
   {#if now >= AT.winner && now < AT.winner + 1}
     <div class="flash"></div>
+  {/if}
+
+  {#if now >= AT.outro && now < AT.outroOut + 1}
+    <div class="outro" class:out={now >= AT.outroOut}><span class="url">{site}</span></div>
   {/if}
 </div>
 
@@ -208,6 +219,60 @@
     from {
       opacity: 0;
       transform: translateY(-120px) scale(0.4);
+    }
+  }
+
+  .brand.out {
+    animation: brand-out calc(var(--beat) * 0.75) cubic-bezier(0.6, -0.3, 0.7, 0.4) forwards;
+  }
+  @keyframes brand-out {
+    to {
+      transform: translateY(-160px) scale(0.6);
+    }
+  }
+
+  .finale {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* The address slams in, bounces on the beat, then drops off the bottom just as the video ends. */
+  .outro {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+  }
+  .outro.out {
+    animation: drop-out calc(var(--beat) * 0.9) cubic-bezier(0.6, -0.3, 0.7, 0.4) forwards;
+  }
+  @keyframes drop-out {
+    to {
+      transform: translateY(800px) rotate(25deg);
+    }
+  }
+  .url {
+    padding: 14px 30px 18px;
+    border-radius: 999px;
+    background: var(--red);
+    box-shadow: 0 20px 50px -12px rgba(255, 59, 92, 0.6);
+    color: white;
+    font: 800 56px / 1 'Bricolage Grotesque', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    rotate: -4deg;
+    animation:
+      url-in calc(var(--beat) * 0.75) var(--spring) calc(var(--beat) * 0.5) both,
+      url-bounce var(--beat) ease-out calc(var(--beat) * 1.5) infinite;
+  }
+  @keyframes url-in {
+    from {
+      opacity: 0;
+      transform: scale(2.8) rotate(12deg);
+    }
+  }
+  @keyframes url-bounce {
+    15% {
+      translate: 0 -6px;
     }
   }
 

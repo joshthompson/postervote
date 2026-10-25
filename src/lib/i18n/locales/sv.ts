@@ -1,4 +1,4 @@
-import type { Messages, Segment } from './en';
+import { period, type Messages, type Segment } from './en';
 
 // Swedish UI text; see en.ts for the conventions.
 // Addresses the visitor as «du», as Swedish sites do.
@@ -40,7 +40,7 @@ export const sv: Messages = {
     rankings: 'Topplista',
     about: 'Om',
     settings: 'Inställningar',
-    past: 'Tidigare tävlingar'
+    collections: 'Samlingar'
   },
 
   vote: {
@@ -179,6 +179,22 @@ export const sv: Messages = {
     rankings: 'Se topplistan'
   },
 
+  collections: {
+    title: 'Samlingar',
+    heading: ['Alla', 'samlingar'],
+    intro: 'Varje samling affischer som röstats om, och hur det gick för var och en.',
+    live: 'Live',
+    votingNow: 'Röstning pågår',
+    vote: 'Rösta →',
+    period: (from: number, to: number | null) => period('sv', from, to, 'nu'),
+    votes: (n: number) => `${num(n)} ${plural(n, 'röst', 'röster')}`,
+    posters: (n: number) => `${num(n)} ${plural(n, 'affisch', 'affischer')}`,
+    winner: 'Vinnare',
+    leading: 'Leder',
+    none: 'Inga samlingar än.',
+    loadError: (message: string) => `Kunde inte ladda samlingarna: ${message}`
+  },
+
   results: {
     title: 'Topplista',
     heading: ['Hela', 'topplistan'],
@@ -190,8 +206,8 @@ export const sv: Messages = {
     },
     viewsLabel: 'Vems röster som visas',
     archived: 'Arkiverad',
-    noCompetitionHere: 'Det finns ingen tävling här.',
-    noCompetition: 'Ingen tävling pågår än.',
+    noCollectionHere: 'Det finns ingen samling här.',
+    noCollection: 'Ingen samling är live än.',
     disagreeSub: 'Där designers och alla andra går isär.',
     final: (votes: number, segment: Segment) =>
       `Slutresultat från ${num(votes)} ${plural(votes, 'duell', 'dueller')}${by(segment)}.`,

@@ -1,6 +1,6 @@
 import { query } from './_generated/server';
 import { v } from 'convex/values';
-import { find } from './competitions';
+import { find } from './collections';
 import { segment } from './schema';
 
 // What the rankings page reads. None of these touch the votes themselves: they read the tallies
@@ -8,35 +8,35 @@ import { segment } from './schema';
 // Posters are referred to by id; the page joins titles and images from `posters.list`.
 
 /**
- * A competition (by slug, or the active one) and its latest snapshot for `segment`: null if
- * there's no such competition; `snapshot` is null until its first votes have been tallied.
+ * A collection (by slug, or the active one) and its latest snapshot for `segment`: null if
+ * there's no such collection; `snapshot` is null until its first votes have been tallied.
  * Changes only when a tally run rebuilds it, at most every 15 minutes.
  */
 export const snapshot = query({
-  args: { segment, competition: v.optional(v.string()) },
+  args: { segment, collection: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const competition = await find(ctx, args.competition);
-    if (!competition) return null;
+    const collection = await find(ctx, args.collection);
+    if (!collection) return null;
     const snap = await ctx.db
       .query('snapshots')
-      .withIndex('by_segment', (q) => q.eq('competitionId', competition._id).eq('segment', args.segment))
+      .withIndex('by_segment', (q) => q.eq('collectionId', collection._id).eq('segment', args.segment))
       .unique();
-    const { slug, title, active } = competition;
-    if (!snap) return { competition: { slug, title, active }, snapshot: null };
-    const { _id, _creationTime, competitionId, segment: _, ...rest } = snap;
-    return { competition: { slug, title, active }, snapshot: rest };
+    const { slug, title, active } = collection;
+    if (!snap) return { collection: { slug, title, active }, snapshot: null };
+    const { _id, _creationTime, collectionId, competitionId, segment: _, ...rest } = snap;
+    return { collection: { slug, title, active }, snapshot: rest };
   }
 });
 
-/** Votes cast in a competition so far, per segment. Tiny, so the page can tick it live. */
+/** Votes cast in a collection so far, per segment. Tiny, so the page can tick it live. */
 export const live = query({
-  args: { competition: v.optional(v.string()) },
+  args: { collection: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const competition = await find(ctx, args.competition);
-    if (!competition) return null;
+    const collection = await find(ctx, args.collection);
+    if (!collection) return null;
     const live = await ctx.db
       .query('live')
-      .withIndex('by_competition', (q) => q.eq('competitionId', competition._id))
+      .withIndex('by_collection', (q) => q.eq('collectionId', collection._id))
       .unique();
     return live ? { all: live.all, designers: live.designers, others: live.others } : { all: 0, designers: 0, others: 0 };
   }

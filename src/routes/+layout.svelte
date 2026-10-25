@@ -21,7 +21,7 @@
   // /admin aren't counted: visitors never see them.
   afterNavigate(({ to }) => {
     if (to?.route.id?.startsWith('/admin')) return;
-    trackPageview({ route: to?.route.id ?? undefined, competition: to?.params?.competition });
+    trackPageview({ route: to?.route.id ?? undefined, collection: to?.params?.collection });
   });
 </script>
 

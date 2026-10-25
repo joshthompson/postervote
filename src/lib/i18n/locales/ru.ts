@@ -1,4 +1,4 @@
-import type { Messages, Segment } from './en';
+import { period, type Messages, type Segment } from './en';
 
 // Russian UI text; see en.ts for the conventions.
 // Addresses the visitor as «вы», which also keeps past-tense verbs free of grammatical gender.
@@ -42,7 +42,7 @@ export const ru: Messages = {
     rankings: 'Рейтинг',
     about: 'О проекте',
     settings: 'Настройки',
-    past: 'Прошлые конкурсы'
+    collections: 'Коллекции'
   },
 
   vote: {
@@ -184,6 +184,22 @@ export const ru: Messages = {
     rankings: 'Смотреть рейтинг'
   },
 
+  collections: {
+    title: 'Коллекции',
+    heading: ['Все', 'коллекции'],
+    intro: 'Все коллекции постеров, за которые голосовали, и чем закончилось каждое голосование.',
+    live: 'Live',
+    votingNow: 'Голосование идёт',
+    vote: 'Голосовать →',
+    period: (from: number, to: number | null) => period('ru', from, to, 'сейчас'),
+    votes: (n: number) => `${num(n)} ${plural(n, 'голос', 'голоса', 'голосов')}`,
+    posters: (n: number) => `${num(n)} ${plural(n, 'постер', 'постера', 'постеров')}`,
+    winner: 'Победитель',
+    leading: 'Лидирует',
+    none: 'Коллекций пока нет.',
+    loadError: (message: string) => `Не удалось загрузить коллекции: ${message}`
+  },
+
   results: {
     title: 'Рейтинг',
     heading: ['Общий', 'рейтинг'],
@@ -195,8 +211,8 @@ export const ru: Messages = {
     },
     viewsLabel: 'Чьи голоса показывать',
     archived: 'Архив',
-    noCompetitionHere: 'Здесь нет конкурса.',
-    noCompetition: 'Пока не идёт ни одного конкурса.',
+    noCollectionHere: 'Здесь нет коллекции.',
+    noCollection: 'Пока не идёт голосование ни по одной коллекции.',
     disagreeSub: 'Где мнения дизайнеров и всех остальных расходятся.',
     final: (votes: number, segment: Segment) =>
       `Итоги: ${num(votes)} ${plural(votes, 'поединок', 'поединка', 'поединков')}${among(segment)}.`,

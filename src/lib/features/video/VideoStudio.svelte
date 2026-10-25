@@ -1,10 +1,9 @@
 <script lang="ts">
-  import { useQuery } from 'convex-svelte';
-  import { api } from '$convex/api';
   import Button from '$lib/components/ui/Button.svelte';
   import Card from '$lib/components/ui/Card.svelte';
   import Loader from '$lib/components/ui/Loader.svelte';
   import Pill from '$lib/components/ui/Pill.svelte';
+  import { useCollections } from '$lib/features/collections/data.svelte';
   import { sound } from '$lib/services/sound.svelte';
   import { posterSrc } from '$lib/utils/images';
   import Reel from './Reel.svelte';
@@ -12,9 +11,9 @@
   import { preloadPosters, useVideoData } from './data.svelte';
   import { plan, type Spawn } from './timeline';
 
-  // Picks a competition and previews its winner video, live with the music, as large as fits the
+  // Picks a collection and previews its winner video, live with the music, as large as fits the
   // window. The video file itself is rendered frame by frame by `pnpm video` (scripts/render-video.mjs,
-  // through the render page next door); this shows the command for the competition picked.
+  // through the render page next door); this shows the command for the collection picked.
   // English only, as it's just for us.
 
   // Seconds between the music restarting and the first beat, so the loop starts cleanly.
@@ -22,13 +21,14 @@
 
   let slug = $state<string | undefined>(undefined);
   const data = useVideoData(() => slug);
-  const archived = useQuery(api.competitions.archived, {});
+  const collections = useCollections();
+  const past = $derived(collections.data.filter((c) => !c.active));
 
   const ranked = $derived(data.ranked);
   const top = $derived(ranked?.slice(0, 3) ?? []);
 
-  // The name the question uses, the competition's title until it's changed here.
-  const title = $derived(data.competition?.title ?? '');
+  // The name the question uses, the collection's title until it's changed here.
+  const title = $derived(data.collection?.title ?? '');
   let name = $state('');
   $effect(() => {
     name = title;
@@ -37,7 +37,7 @@
   /** Quoted for the shell. */
   const quote = (s: string) => `'${s.replaceAll("'", `'\\''`)}'`;
   const command = $derived(
-    data.competition ? `pnpm video ${data.competition.slug}${name && name !== title ? ` --name ${quote(name)}` : ''}` : ''
+    data.collection ? `pnpm video ${data.collection.slug}${name && name !== title ? ` --name ${quote(name)}` : ''}` : ''
   );
   let copied = $state(false);
   async function copy() {
@@ -60,7 +60,7 @@
     run = null;
     loaded = 0;
     images = await preloadPosters(ranked, () => loaded++);
-    await document.fonts.load('64px "Remi Pop"');
+    await Promise.all([document.fonts.load('64px "Remi Pop"'), document.fonts.load('800 56px "Bricolage Grotesque"')]);
     if (!open) return;
     ready = true;
     start();
@@ -90,19 +90,19 @@
 
 <svelte:window {onkeydown} />
 
-{#if archived.data?.length}
-  <nav class="picker" aria-label="Competition">
+{#if past.length}
+  <nav class="picker" aria-label="Collection">
     <Pill variant={slug ? 'outline' : 'ink'} pressed={!slug} onclick={() => (slug = undefined)}>Current</Pill>
-    {#each archived.data as c (c.slug)}
+    {#each past as c (c.slug)}
       <Pill variant={slug === c.slug ? 'ink' : 'outline'} pressed={slug === c.slug} onclick={() => (slug = c.slug)}>{c.title}</Pill>
     {/each}
   </nav>
 {/if}
 
 {#if data.error}
-  <p class="message">Couldn't load the competition: {data.error.message}</p>
+  <p class="message">Couldn't load the collection: {data.error.message}</p>
 {:else if data.missing}
-  <p class="message">No competition yet. Sync some posters first.</p>
+  <p class="message">No collection yet. Sync some posters first.</p>
 {:else if !ranked}
   <Loader />
 {:else}
@@ -112,8 +112,8 @@
       <input bind:value={name} />
     </label>
     <p class="note">
-      {ranked.length} posters · {data.votes.toLocaleString('en-GB')} votes{data.competition?.active ? ' so far' : ''}.
-      {#if data.competition?.active}The rankings are up to 15 minutes behind.{/if}
+      {ranked.length} posters · {data.votes.toLocaleString('en-GB')} votes{data.collection?.active ? ' so far' : ''}.
+      {#if data.collection?.active}The rankings are up to 15 minutes behind.{/if}
     </p>
     <ol class="top">
       {#each top as p (p._id)}
@@ -122,7 +122,8 @@
     </ol>
     <Button label="Preview" variant="ink" px={1} onclick={preview} />
     <p class="note">
-      Music follows the sound button (top left) or <kbd>M</kbd>. <kbd>Space</kbd> replays, <kbd>Esc</kbd> closes.
+      It plays on repeat, as Instagram does. Music follows the sound button (top left) or <kbd>M</kbd>.
+      <kbd>Space</kbd> starts it over, <kbd>Esc</kbd> closes.
     </p>
     <div class="render">
       <span>To make the video file (1080 × 1920, 30 fps, with the music), run this with <code>pnpm dev</code> running:</span>
@@ -133,7 +134,7 @@
 {/if}
 
 {#if open}
-  <Stage>
+  <Stage startAt={run?.startAt}>
     {#if run}
       {#key run}
         <Reel startAt={run.startAt} spawns={run.spawns} {top} {name} votes={data.votes} />

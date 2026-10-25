@@ -14,49 +14,74 @@ const segmentCounts = v.object({
   located: v.number(),
   cities: v.number()
 });
+// Which collection a row belongs to. Optional only until `migrations.collections` has run, which
+// moves every row over from the legacy `competitionId`; make it required when that field goes.
+const collectionId = v.optional(v.id('collections'));
+const legacyCompetitionId = v.optional(v.id('competitions'));
+
 const duel = v.union(
   v.null(),
   v.object({ aId: v.id('posters'), bId: v.id('posters'), aWins: v.number(), bWins: v.number() })
 );
 
 export default defineSchema({
-  // One is active (being voted on); the rest are archives.
-  competitions: defineTable({
-    // Stable key from posters/competition.json, also used in results URLs.
+  // One is live (being voted on). The rest have closed: once a closed one is archived to
+  // archives/<slug>/ in the repo, `archive.clear` deletes it and everything in it from here.
+  collections: defineTable({
+    // Stable key from posters/collection.json, also used in URLs.
     slug: v.string(),
     title: v.string(),
     active: v.boolean(),
+    // When it was published (for a migrated competition, when that was made).
+    openedAt: v.number(),
     // When its poster list last changed, so pages can keep their copy until it does (see posters.list).
     postersUpdatedAt: v.optional(v.number()),
     // Posters taken out of it. Their pairs keep their places in each visitor's order and are
     // skipped, so taking a poster out doesn't reshuffle anyone's order (see pairing.ts).
-    removed: v.optional(v.array(v.id('posters')))
+    removed: v.optional(v.array(v.id('posters'))),
+    // When voting closed, set by publishing another collection or by `archive.close`.
+    closedAt: v.optional(v.number()),
+    // When its archive was written to the repo; only then can `archive.clear` delete it.
+    archivedAt: v.optional(v.number()),
+    // Legacy: the id it had as a competition, which browsers key their place in the vote order by
+    // (see progress.ts). Set by `migrations.collections`; remove once those places are moved over.
+    formerId: v.optional(v.string())
   })
     .index('by_slug', ['slug'])
     .index('by_active', ['active']),
 
+  // Legacy: renamed to `collections` by `migrations.collections`, which empties it. Remove after,
+  // with every `competitionId` below.
+  competitions: defineTable({
+    slug: v.string(),
+    title: v.string(),
+    active: v.boolean(),
+    postersUpdatedAt: v.optional(v.number()),
+    removed: v.optional(v.array(v.id('posters')))
+  }),
+
   posters: defineTable({
-    // Missing on posters from before competitions; the first sync adopts them.
-    competitionId: v.optional(v.id('competitions')),
+    collectionId,
+    competitionId: legacyCompetitionId,
     // Stable key (the image filename) so re-syncing updates rather than duplicates.
     key: v.string(),
     title: v.string(),
     // Path relative to the site base (e.g. "posters/<slug>/foo.jpg") or an absolute URL.
     image: v.string(),
-    // Whether it's still in the competition; removed posters keep their votes.
+    // Whether it's still in the collection; removed posters keep their votes.
     active: v.boolean(),
     // Legacy: scores now live in `standings`. Cleared by `migrations.cleanupLegacy`; remove after.
     rating: v.optional(v.number()),
     wins: v.optional(v.number()),
     losses: v.optional(v.number())
   })
-    .index('by_competition_key', ['competitionId', 'key'])
-    .index('by_competition_active', ['competitionId', 'active']),
+    .index('by_collection_key', ['collectionId', 'key'])
+    .index('by_collection_active', ['collectionId', 'active']),
 
   // The raw record. Everything the results show is tallied from these by `tally.run`.
   votes: defineTable({
-    // Missing on votes from before competitions; backfilled by `votes.backfill`.
-    competitionId: v.optional(v.id('competitions')),
+    collectionId,
+    competitionId: legacyCompetitionId,
     winnerId: v.id('posters'),
     loserId: v.id('posters'),
     voterId: v.string(),
@@ -68,7 +93,7 @@ export default defineSchema({
     city: v.optional(v.string())
   })
     .index('by_voter', ['voterId'])
-    .index('by_competition', ['competitionId'])
+    .index('by_collection', ['collectionId'])
     // A pair's votes that the tally hasn't reached yet, for the instant result after voting.
     .index('by_matchup', ['winnerId', 'loserId']),
 
@@ -82,9 +107,10 @@ export default defineSchema({
 
   // --- Tallies, written only by `tally.run` (except `live`, which `votes.cast` bumps). ---
 
-  // Per competition: how far the tally has got, when it next runs, and its running counts.
+  // Per collection: how far the tally has got, when it next runs, and its running counts.
   progress: defineTable({
-    competitionId: v.id('competitions'),
+    collectionId,
+    competitionId: legacyCompetitionId,
     // _creationTime of the last vote tallied; 0 before the first.
     cursor: v.number(),
     // A run is scheduled for `scheduledFor`, so casts needn't schedule another.
@@ -104,20 +130,22 @@ export default defineSchema({
         others: v.optional(v.id('snapshots'))
       })
     )
-  }).index('by_competition', ['competitionId']),
+  }).index('by_collection', ['collectionId']),
 
-  // Per competition: votes cast, bumped by every cast and corrected by each tally run. Tiny, so
+  // Per collection: votes cast, bumped by every cast and corrected by each tally run. Tiny, so
   // the rankings page can tick live without refetching the rankings.
   live: defineTable({
-    competitionId: v.id('competitions'),
+    collectionId,
+    competitionId: legacyCompetitionId,
     all: v.number(),
     designers: v.number(),
     others: v.number()
-  }).index('by_competition', ['competitionId']),
+  }).index('by_collection', ['collectionId']),
 
   // Per poster: its Elo rating and record with each group of voters.
   standings: defineTable({
-    competitionId: v.id('competitions'),
+    collectionId,
+    competitionId: legacyCompetitionId,
     posterId: v.id('posters'),
     // Mirrors the poster's `active`, so the tally can skip removed posters without reading them.
     active: v.boolean(),
@@ -126,12 +154,13 @@ export default defineSchema({
     others: score
   })
     .index('by_poster', ['posterId'])
-    .index('by_competition', ['competitionId']),
+    .index('by_collection', ['collectionId']),
 
   // Per segment and unordered poster pair (aId < bId): how their head-to-heads went.
   // `closeKey` / `lopKey` order contested pairs (2+ votes) for the closest and most lopsided.
   matchups: defineTable({
-    competitionId: v.id('competitions'),
+    collectionId,
+    competitionId: legacyCompetitionId,
     segment,
     aId: v.id('posters'),
     bId: v.id('posters'),
@@ -146,43 +175,47 @@ export default defineSchema({
     .index('by_pair', ['segment', 'aId', 'bId'])
     .index('by_a', ['segment', 'aId'])
     .index('by_b', ['segment', 'bId'])
-    .index('by_close', ['competitionId', 'segment', 'contested', 'closeKey'])
-    .index('by_lopsided', ['competitionId', 'segment', 'contested', 'lopKey']),
+    .index('by_close', ['collectionId', 'segment', 'contested', 'closeKey'])
+    .index('by_lopsided', ['collectionId', 'segment', 'contested', 'lopKey']),
 
-  // Per competition and voter: how many votes, and whether any came as a designer / non-designer.
+  // Per collection and voter: how many votes, and whether any came as a designer / non-designer.
   voters: defineTable({
-    competitionId: v.id('competitions'),
+    collectionId,
+    competitionId: legacyCompetitionId,
     voterId: v.string(),
     votes: v.number(),
     designers: v.boolean(),
     others: v.boolean()
-  }).index('by_competition_voter', ['competitionId', 'voterId']),
+  }).index('by_collection_voter', ['collectionId', 'voterId']),
 
   // Votes per segment and country.
   countries: defineTable({
-    competitionId: v.id('competitions'),
+    collectionId,
+    competitionId: legacyCompetitionId,
     segment,
     code: v.string(),
     votes: v.number()
-  }).index('by_code', ['competitionId', 'segment', 'code']),
+  }).index('by_code', ['collectionId', 'segment', 'code']),
 
   // Votes per segment and city, and the city's favourite poster (most wins there, then fewest
   // matches), kept up to date by the tally so snapshots needn't look it up. null: no wins yet;
   // missing: not known (made before favourites were kept), so the next snapshot works it out.
   cities: defineTable({
-    competitionId: v.id('competitions'),
+    collectionId,
+    competitionId: legacyCompetitionId,
     segment,
     country: v.string(),
     city: v.string(),
     votes: v.number(),
     best: v.optional(v.union(v.null(), v.object({ posterId: v.id('posters'), wins: v.number(), matches: v.number() })))
   })
-    .index('by_city', ['competitionId', 'segment', 'country', 'city'])
-    .index('by_votes', ['competitionId', 'segment', 'votes']),
+    .index('by_city', ['collectionId', 'segment', 'country', 'city'])
+    .index('by_votes', ['collectionId', 'segment', 'votes']),
 
   // Per segment, city and poster: its record there, for local favourites and biggest fans.
   cityPosters: defineTable({
-    competitionId: v.id('competitions'),
+    collectionId,
+    competitionId: legacyCompetitionId,
     segment,
     country: v.string(),
     city: v.string(),
@@ -190,23 +223,25 @@ export default defineSchema({
     wins: v.number(),
     matches: v.number()
   })
-    .index('by_city_poster', ['competitionId', 'segment', 'country', 'city', 'posterId'])
-    .index('by_city_wins', ['competitionId', 'segment', 'country', 'city', 'wins'])
+    .index('by_city_poster', ['collectionId', 'segment', 'country', 'city', 'posterId'])
+    .index('by_city_wins', ['collectionId', 'segment', 'country', 'city', 'wins'])
     .index('by_poster_wins', ['posterId', 'segment', 'wins']),
 
-  // Votes per competition and hour (ms since epoch / HOUR_MS), for "votes today".
+  // Votes per collection and hour (ms since epoch / HOUR_MS), for "votes today".
   hours: defineTable({
-    competitionId: v.id('competitions'),
+    collectionId,
+    competitionId: legacyCompetitionId,
     hour: v.number(),
     all: v.number(),
     designers: v.number(),
     others: v.number()
-  }).index('by_hour', ['competitionId', 'hour']),
+  }).index('by_hour', ['collectionId', 'hour']),
 
   // What the rankings page shows for a segment, rebuilt by each tally run that changed it.
   // Posters are referred to by id; the page joins titles and images from `results.posters`.
   snapshots: defineTable({
-    competitionId: v.id('competitions'),
+    collectionId,
+    competitionId: legacyCompetitionId,
     segment,
     builtAt: v.number(),
     // Votes tallied into this snapshot.
@@ -239,5 +274,5 @@ export default defineSchema({
       ),
       localMinVotes: v.number()
     })
-  }).index('by_segment', ['competitionId', 'segment'])
+  }).index('by_segment', ['collectionId', 'segment'])
 });

@@ -273,16 +273,18 @@ export const sound = new Sound();
 
 /**
  * The loop from its first beat for `seconds`, with the vote effect at each of `zaps` (seconds),
- * rendered offline (faster than real time, no gesture needed). It fades out over the last second.
+ * rendered offline (faster than real time, no gesture needed), to play on repeat: `seconds` should
+ * be a whole number of 4-bar loops. It's rendered twice over and the second time round kept, so it
+ * starts with the end's echoes still ringing and loops without a seam.
  */
-export function renderMusic(seconds: number, zaps: number[], sampleRate = 48_000) {
-  const ctx = new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate);
-  const fade = ctx.createGain();
-  fade.gain.setValueAtTime(1, Math.max(0, seconds - 1));
-  fade.gain.linearRampToValueAtTime(0, seconds);
-  fade.connect(ctx.destination);
-  const synth = new Synth(ctx, fade);
-  for (let step = 0; step * STEP < seconds; step++) synth.playStep(step % 64, step * STEP);
-  for (const t of zaps) synth.vote(t, Math.floor(t / STEP / 16) % 4);
-  return ctx.startRendering();
+export async function renderMusic(seconds: number, zaps: number[], sampleRate = 48_000) {
+  const length = Math.round(seconds * sampleRate);
+  const ctx = new OfflineAudioContext(2, length * 2, sampleRate);
+  const synth = new Synth(ctx, ctx.destination);
+  for (let step = 0; step * STEP < seconds * 2; step++) synth.playStep(step % 64, step * STEP);
+  for (const lap of [0, seconds]) for (const t of zaps) synth.vote(lap + t, Math.floor(t / STEP / 16) % 4);
+  const twice = await ctx.startRendering();
+  const once = new AudioBuffer({ length, numberOfChannels: 2, sampleRate });
+  for (let c = 0; c < 2; c++) once.copyToChannel(twice.getChannelData(c).subarray(length), c);
+  return once;
 }

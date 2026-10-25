@@ -6,7 +6,7 @@
   let { params }: PageProps = $props();
 </script>
 
-<!-- /poster/<competition slug>/<poster name>: one poster's own page, to link to. -->
+<!-- /poster/<collection slug>/<poster name>: one poster's own page, to link to. -->
 <Page width="wide">
-  <PosterView competition={params.competition} name={params.name} />
+  <PosterView collection={params.collection} name={params.name} />
 </Page>

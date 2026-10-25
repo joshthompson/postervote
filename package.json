@@ -15,6 +15,7 @@
     "video": "node scripts/render-video.mjs",
     "posters:sync": "node scripts/sync-posters.mjs",
     "posters:sync:prod": "dotenv -e .env.production -- node scripts/sync-posters.mjs --prod",
+    "collections": "node scripts/collections.mjs",
     "deploy:convex": "dotenv -e .env.production -- convex deploy",
     "deploy:web": "dotenv -e .env.production -- convex deploy --cmd-url-env-var-name PUBLIC_CONVEX_URL --cmd \"pnpm build\" && touch build/.nojekyll && gh-pages -d build --dotfiles",
     "ship": "pnpm deploy:web && pnpm posters:sync:prod"

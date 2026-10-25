@@ -1,9 +1,9 @@
 <script lang="ts">
   import PixelText from '$lib/components/pixel/PixelText.svelte';
 
-  // The big two-word heading with its squiggle, the competition's name, and a line about the data.
+  // The big two-word heading with its squiggle, the collection's name, and a line about the data.
 
-  let { heading, competition, sub }: { heading: string[]; competition?: string; sub: string } = $props();
+  let { heading, collection, sub }: { heading: string[]; collection?: string; sub: string } = $props();
 </script>
 
 <section class="hero">
@@ -14,8 +14,8 @@
   <svg class="squiggle" viewBox="0 0 300 20" preserveAspectRatio="none" aria-hidden="true">
     <path d="M2 12 Q 20 2, 40 12 T 80 12 T 120 12 T 160 12 T 200 12 T 240 12 T 280 12 T 298 10" />
   </svg>
-  {#if competition}
-    <p class="competition"><span class="legible">{competition}</span></p>
+  {#if collection}
+    <p class="collection"><span class="legible">{collection}</span></p>
   {/if}
   <p class="sub"><span class="legible">{sub}</span></p>
 </section>
@@ -66,7 +66,7 @@
       stroke-dashoffset: 0;
     }
   }
-  .competition {
+  .collection {
     margin: 18px 0 0;
     line-height: 2;
     font-weight: 700;

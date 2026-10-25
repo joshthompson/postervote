@@ -11,6 +11,7 @@
   let {
     poster,
     segment,
+    collection,
     posterById,
     shareHref,
     onshare,
@@ -18,7 +19,9 @@
   }: {
     poster: RankedPoster | null;
     segment: Segment;
-    /** The competition's posters, to name the opponents. */
+    /** Its collection's slug; undefined for the active one. */
+    collection?: string;
+    /** The collection's posters, to name the opponents. */
     posterById: Map<PosterInfo['_id'], PosterInfo>;
     /** The open poster's page, to share. */
     shareHref?: string;
@@ -42,7 +45,7 @@
   onclick={(e) => e.target === dialog && dialog.close()}
 >
   {#if poster}
-    <PosterPanel {poster} {segment} {posterById} {shareHref} {onshare} onclose={() => dialog.close()} />
+    <PosterPanel {poster} {segment} {collection} {posterById} {shareHref} {onshare} onclose={() => dialog.close()} />
   {/if}
 </dialog>
 

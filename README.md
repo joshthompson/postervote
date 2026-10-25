@@ -24,15 +24,15 @@ Then open the URL Vite prints.
 
 See `.env.example`. Both files are gitignored.
 
-## Competitions and posters
+## Collections and posters
 
-Posters are voted on within a competition. One competition is active at a time. Past competitions are archived: their results stay at `/results/<slug>`, which is linked from the burger menu.
+Posters are voted on within a collection. One collection is live at a time. `/collections` lists them all: the live one first, marked as live, then the closed ones, each with its top three as a preview. `/collections/<slug>` shows a collection's results, and `/results` is the live one's (old `/results/<slug>` links redirect to `/collections/<slug>`).
 
 Each poster has its own page at `/poster/<slug>/<name>`, where the name comes from its title (`Dungen – Vidrig Vår (Album)` becomes `dungen-vidrig-var-album`), so changing a title changes its link. On the rankings, clicking a poster opens the same detail in a modal and puts that link in the address bar.
 
-Link previews of a poster's page show that poster. Crawlers don't run the app, so the build asks Convex (`posters.all`) for every poster and prerenders a page for each one, and `src/hooks.server.ts` puts the poster's title and image into the preview tags from `app.html` (see `src/lib/server/previews.ts`). A poster synced after the build still opens, through the `404.html` fallback, but its link previews as the site until the next deploy. `pnpm ship` builds before it syncs, so after adding posters, deploy again or push to `main`. If the build can't reach Convex, it warns and carries on without the poster pages.
+Link previews of a poster's page show that poster. Crawlers don't run the app, so the build prerenders a page for every poster, in Convex (`posters.all`) or in an archive, and `src/hooks.server.ts` puts the poster's title and image into the preview tags from `app.html` (see `src/lib/server/previews.ts`). A poster synced after the build still opens, through the `404.html` fallback, but its link previews as the site until the next deploy. `pnpm ship` builds before it syncs, so after adding posters, deploy again or push to `main`. If the build can't reach Convex, it warns and carries on without the poster pages that are in Convex.
 
-`posters/` holds the active competition. `posters/competition.json` names it:
+`posters/` holds the live collection. `posters/collection.json` names it:
 
 ```json
 { "slug": "stockholm-2026-09", "title": "Stockholm - September 2026" }
@@ -41,12 +41,27 @@ Link previews of a poster's page show that poster. Crawlers don't run the app, s
 Put images (JPEG, PNG, WebP, or HEIC on macOS) in `posters/`, then run `pnpm posters:sync`. The script:
 
 1. converts and resizes each image into `static/posters/<slug>/` using macOS `sips`
-2. makes that competition the active one and archives any other
-3. upserts each poster in the competition, keyed by filename; posters whose files have been removed are deactivated, and their votes are kept (to delete their votes too, see `posters:remove` below)
+2. upserts each poster in the live collection, keyed by filename; posters whose files have been removed are deactivated, and their votes are kept (to delete their votes too, see `posters:remove` below)
+
+`posters:sync` only updates the live collection: a slug that isn't the live one is refused, so a typo can't close voting.
 
 Each visitor sees the pairs in their own fixed order. Taking a poster out leaves gaps in it rather than reshuffling it, so nobody is shown pairs they've already voted on. Adding a poster does reshuffle it. Until a visitor has seen every poster, a progress bar fills as they go, and pairs of posters they've already seen are skipped, so it takes about half as many pairs as there are posters.
 
-To start a new competition, give `competition.json` a new slug and title, replace the images and `titles.json`, and sync. The old competition's images stay in `static/posters/<old slug>/` for its archive.
+### Publishing and archiving a collection
+
+`pnpm collections` (`scripts/collections.mjs`) does it all. Add `--prod` for production; with no command, it lists the collections in Convex and in `archives/`.
+
+1. **Publish the next one.** Give `collection.json` a new slug and title, replace the images and `titles.json`, and run `pnpm collections publish`. It syncs like `posters:sync`, makes the new collection the live one, and closes voting on the one before. The old collection's images stay in `static/posters/<old slug>/`. Commit and deploy as usual.
+2. **Archive the old one.** Run `pnpm collections archive <old slug>`. It waits for the tally to count the last votes, then writes `archives/<slug>/`:
+   - `summary.json`: what `/collections` shows
+   - `results.json`: everything the collection's pages show (rankings for each voter group, head-to-heads, biggest fans and the admin stats), loaded only when the collection is opened
+   - `votes.json.gz`: every vote, as a backup. Voters are numbered in the order they first voted, not by their browser's id, because the repo is public.
+
+   The site is built with these files (`src/lib/features/collections/archives.svelte.ts`) and reads an archived collection from them, never from Convex. To end voting without a new collection, archive the live one with `--close`.
+3. **Commit `archives/<slug>/` and deploy.**
+4. **Clear it from Convex.** Run `pnpm collections clear <slug>`. It deletes the collection's votes, posters and tallies from Convex, a batch at a time. It asks you to type the slug first (`--yes` skips that). With `--prod`, it first checks that `https://postervote.com/collections/<slug>` is live, which is true once a build with the archive is deployed (`--force` skips that check).
+
+An archived slug can't be published again. Archives from the dev deployment are marked as such, and `archive --prod` won't overwrite them without `--force`. Don't commit a dev archive.
 
 Titles default to the filename (`001.jpg` becomes "No. 1"). To set your own, add them to `posters/titles.json`:
 
@@ -54,7 +69,7 @@ Titles default to the filename (`001.jpg` becomes "No. 1"). To set your own, add
 { "001.jpg": "Bo Kaspers Orkester" }
 ```
 
-`posters/` holds the originals and is gitignored, apart from `competition.json` and `titles.json`. Commit `static/posters/`, which holds the optimised copies.
+`posters/` holds the originals and is gitignored, apart from `collection.json` and `titles.json`. Commit `static/posters/`, which holds the optimised copies.
 
 ## Pixel letters
 
@@ -75,7 +90,7 @@ Use the lettering through `PixelText` (or `Logo` for the drifting header logo). 
 | `pnpm preview`           | Serve the production build locally                                             |
 | `pnpm check`             | Typecheck                                                                      |
 | `pnpm font`              | Rebuild the pixel font from the letter drawings                                |
-| `pnpm video [slug]`      | Render a competition's winner video (the active one by default) to `videos/<slug>.mp4`: 1080 × 1920, 30 fps, H.264 with the music. Needs `pnpm dev` running and Google Chrome installed. `--name '…'` changes the name in the question, `--fps 60` the frame rate, `--out` the file, `--url` the site it renders from |
+| `pnpm video [slug]`      | Render a collection's winner video (the active one by default) to `videos/<slug>.mp4`: 1080 × 1920, 30 fps, H.264 with the music. Needs `pnpm dev` running and Google Chrome installed. `--name '…'` changes the name in the question, `--fps 60` the frame rate, `--out` the file, `--url` the site it renders from |
 | `pnpm map`               | Rebuild the world map on `/admin/stats` (`src/lib/features/stats/world.json`) from Natural Earth's shapes |
 | `pnpm posters:sync`      | Sync posters to the dev deployment                                             |
 | `pnpm posters:sync:prod` | Sync posters to the prod deployment                                            |
@@ -93,12 +108,29 @@ After a normal deploy nothing needs running: the first vote, or the hourly check
 
 | Command                                                       | What it does                                                                 |
 | ------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `npx convex run migrations:rebuild`                           | Recount every competition from its votes (the old rankings show until done)  |
-| `npx convex run posters:merge '{"competition":"<slug>","keepKey":"060.jpg","dropKey":"061.jpg"}'` | Fold a duplicate poster into another, then recount                      |
-| `npx convex run posters:remove '{"competition":"<slug>","keys":["069.jpg"]}'` | Take posters out and delete every vote they were in, then recount. Delete their files from `posters/` too, or the next sync brings them back |
-| `npx convex run migrations:refreshSnapshots`                 | Rebuild every competition's rankings without recounting, e.g. after changing `RATING_SYSTEM` |
-| `npx convex run migrations:tallyAll`                          | Start the tally for competitions that have never had one (e.g. old archives) |
+| `npx convex run migrations:rebuild`                           | Recount every collection from its votes (the old rankings show until done)  |
+| `npx convex run posters:merge '{"collection":"<slug>","keepKey":"060.jpg","dropKey":"061.jpg"}'` | Fold a duplicate poster into another, then recount                      |
+| `npx convex run posters:remove '{"collection":"<slug>","keys":["069.jpg"]}'` | Take posters out and delete every vote they were in, then recount. Delete their files from `posters/` too, or the next sync brings them back |
+| `npx convex run migrations:refreshSnapshots`                 | Rebuild every collection's rankings without recounting, e.g. after changing `RATING_SYSTEM` |
+| `npx convex run migrations:tallyAll`                          | Start the tally for collections that have never had one                      |
 | `npx convex run migrations:cleanupLegacy`                     | Remove scores stored the old way (on posters and in `pairs`)                 |
+| `npx convex run migrations:collections`                       | One-off: move competitions over to collections (see below)                   |
+
+### Renaming competitions to collections
+
+Competitions became collections. Convex can't rename a table or a field, so the data is moved over by a migration, in this order:
+
+1. Deploy as usual: push to `main` (or `pnpm deploy:web`). Until the next step has started, the live site finds no live collection, so start it as soon as the deploy is done.
+2. `npx convex run migrations:collections --prod`, then wait until `npx convex data competitions --prod` is empty (a minute or so).
+3. Deploy again (`gh workflow run deploy.yml`, or `pnpm deploy:web`). The first build ran before there were any collections, so its poster pages have no link previews.
+
+Voting carries on throughout, apart from the moment between steps 1 and 2. The migration runs itself step by step:
+
+1. Copies each competition into `collections`, keeping its old id as `formerId`, so visitors keep their place in the vote order (their browsers kept it under that id).
+2. Moves each poster and vote from `competitionId` over to `collectionId`. Poster ids don't change.
+3. Deletes the tallies and recounts them from the votes. The rankings keep showing their snapshot until the recount is done.
+
+Once it's done, a later deploy can drop the `competitions` table and every `competitionId` field from `convex/schema.ts`, and make `collectionId` required. `formerId` can go once returning visitors have had time to come back.
 
 ## Code layout
 
@@ -109,7 +141,7 @@ Routes in `src/routes/` are thin: each page composes components from `src/lib/`.
 | `lib/components/ui/`      | Small reusable pieces with no app knowledge: buttons, pills, cards, meters, loader  |
 | `lib/components/pixel/`   | The hand-drawn pixel lettering (`PixelText`, `Logo`) and the letters' sizes         |
 | `lib/components/layout/`  | The site frame: header, menu, polka-dot background, page container                  |
-| `lib/features/<feature>/` | Everything for one part of the site (`vote`, `results`, `settings`, `designer`): its components, logic and types, side by side |
+| `lib/features/<feature>/` | Everything for one part of the site (`vote`, `results`, `collections`, `settings`, `designer`): its components, logic and types, side by side |
 | `lib/services/`           | Browser-facing services: `storage` (all localStorage access), voter id, sound, `analytics` (Mixpanel) |
 | `lib/state/`              | Shared app state, as rune classes                                                   |
 | `lib/i18n/`               | The current language, and one file of UI text per language in `locales/`            |
@@ -127,8 +159,8 @@ Usage is counted with Mixpanel, from the browser, through `src/lib/services/anal
 Three "hidden" pages are just for us: nothing links to them, search engines are asked to skip them, their visits aren't tracked, and they have no sign-in.
 
 - `/admin/share` makes links and QR codes tagged with where they're handed out (see AGENTS.md).
-- `/admin/video` previews a competition's winner video for Instagram: the logo, "What was the best poster of …?", most of its posters flying in and piling up, "The votes are in!", then third, second and the winner, all on the beat of the site's music (`src/lib/features/video/`, timings in `timeline.ts`). Space replays, M mutes, Esc closes. It shows the `pnpm video` command that makes the file.
-- `/admin/stats` shows a competition's votes per day and by hour of the day (designers and non-designers stacked), a map of the countries they come from, how many votes each voter casts, and the tally's state. Like the rankings, it reads the tallies (`stats.overview` in `convex/stats.ts`), never the votes, so it's up to 15 minutes behind.
+- `/admin/video` previews a collection's winner video for Instagram: the logo, "What was the best poster of …?", most of its posters flying in and piling up, "The votes are in!", then third, second and the winner, and the site's address, all on the beat of the site's music (`src/lib/features/video/`, timings in `timeline.ts`). Its end clears to the bare stage it starts on, so it loops seamlessly, as Instagram plays it. Space replays, M mutes, Esc closes. It shows the `pnpm video` command that makes the file.
+- `/admin/stats` shows a collection's votes per day and by hour of the day (designers and non-designers stacked), a map of the countries they come from, how many votes each voter casts, and the tally's state. Like the rankings, it reads the tallies (`stats.overview` in `convex/stats.ts`), never the votes, so it's up to 15 minutes behind. For an archived collection, both read the archive.
 
 ## Deploying to GitHub Pages
 

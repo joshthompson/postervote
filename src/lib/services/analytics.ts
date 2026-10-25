@@ -22,8 +22,8 @@ const TOKEN = 'dee90a554373b90652f9bfd2c1f51290';
 const mixpanel = core as unknown as OverridedMixpanel;
 
 type Method = 'click' | 'keyboard';
-/** The poster an event is about, and its competition's slug. */
-type AboutPoster = { competition?: string; poster_id: string; poster_title: string };
+/** The poster an event is about, and its collection's slug. */
+type AboutPoster = { collection?: string; poster_id: string; poster_title: string };
 /** A vote on a pair: `poster_*` is the pick. */
 type AboutVote = AboutPoster & {
   opponent_poster_id: string;
@@ -31,7 +31,7 @@ type AboutVote = AboutPoster & {
   chosen_side: 'left' | 'right';
   method: Method;
 };
-export type NavDestination = 'vote' | 'rankings' | 'about' | 'settings' | 'past_results';
+export type NavDestination = 'vote' | 'rankings' | 'collections' | 'collection' | 'about' | 'settings';
 
 export type Events = {
   voting_started: { trigger: 'start_button' | 'designer_answer' };
@@ -53,12 +53,12 @@ export type Events = {
     /** Whether Convex's WebSocket was connected when it failed. */
     is_connected: boolean;
   };
-  pair_skipped: { competition?: string; poster_ids: string[]; poster_titles: string[]; votes_this_visit: number };
+  pair_skipped: { collection?: string; poster_ids: string[]; poster_titles: string[]; votes_this_visit: number };
   reveal_dismissed: { method: Method; is_autoplay_paused: boolean };
   past_votes_opened: { placement: 'vote_reveal' | 'vote_pair'; votes_this_visit: number };
   /** `votes_viewed`: how many of the old votes they looked at. */
   past_votes_closed: { method: Method; votes_viewed: number };
-  all_posters_seen: { competition?: string; posters_total: number; votes_this_visit: number };
+  all_posters_seen: { collection?: string; posters_total: number; votes_this_visit: number };
   poster_shared: AboutPoster & { placement: 'vote_reveal' | 'past_votes' | 'rankings_modal' | 'poster_page'; outcome: ShareOutcome };
   site_shared: { outcome: ShareOutcome };
   coffee_link_clicked: { placement: 'corner_button' | 'about_page' };
@@ -76,7 +76,7 @@ export type Events = {
   /** The new setting: whether the revealed votes wait for them. It lasts the visit. */
   autoplay_toggled: { is_autoplay_paused: boolean };
   vote_history_cleared: { vote_count?: number };
-  rankings_view_changed: { competition?: string; view: View; previous_view: View };
+  rankings_view_changed: { collection?: string; view: View; previous_view: View };
   poster_details_opened: AboutPoster & {
     poster_rank?: number;
     view: View;
@@ -84,9 +84,9 @@ export type Events = {
   };
   nav_link_clicked: {
     destination: NavDestination;
-    placement: 'logo' | 'header_pill' | 'menu' | 'vote_message' | 'error_page';
-    /** For a past competition's results. */
-    competition?: string;
+    placement: 'logo' | 'header_pill' | 'menu' | 'vote_message' | 'error_page' | 'collections_page';
+    /** The collection a link to its page (or a vote link) is for. */
+    collection?: string;
   };
 };
 
@@ -131,8 +131,8 @@ export function track<E extends keyof Events>(event: E, props: Events[E], { beac
   client().track(event, all, beacon ? { transport: 'sendBeacon' } : undefined);
 }
 
-/** Record a page view: `route` is its SvelteKit route id, e.g. "/poster/[competition]/[name]". */
-export function trackPageview(props: { route?: string; competition?: string }) {
+/** Record a page view: `route` is its SvelteKit route id, e.g. "/poster/[collection]/[name]". */
+export function trackPageview(props: { route?: string; collection?: string }) {
   const all = defined({ ...common(), ...props });
   if (!live) return console.info('[analytics]', '$mp_web_page_view', all);
   client().track_pageview(all);

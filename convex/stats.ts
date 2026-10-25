@@ -1,6 +1,6 @@
 import { query } from './_generated/server';
 import { v } from 'convex/values';
-import { find } from './competitions';
+import { find } from './collections';
 
 // What the hidden /admin/stats page reads. Like the rankings, it reads the tallies that tally.ts
 // keeps rather than the votes, so it only changes when a tally run does (at most every 15 minutes).
@@ -10,34 +10,34 @@ import { find } from './competitions';
 const VOTER_CAP = 15_000;
 
 /**
- * A competition (by slug, or the active one): its votes per hour and per country, the tally's
+ * A collection (by slug, or the active one): its votes per hour and per country, the tally's
  * running counts and state, how many posters are in it, and how many voters cast each number of
- * votes. null if there's no such competition.
+ * votes. null if there's no such collection.
  */
 export const overview = query({
-  args: { competition: v.optional(v.string()) },
+  args: { collection: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const competition = await find(ctx, args.competition);
-    if (!competition) return null;
-    const competitionId = competition._id;
+    const collection = await find(ctx, args.collection);
+    if (!collection) return null;
+    const collectionId = collection._id;
 
     const hours = await ctx.db
       .query('hours')
-      .withIndex('by_hour', (q) => q.eq('competitionId', competitionId))
+      .withIndex('by_hour', (q) => q.eq('collectionId', collectionId))
       .collect();
     const progress = await ctx.db
       .query('progress')
-      .withIndex('by_competition', (q) => q.eq('competitionId', competitionId))
+      .withIndex('by_collection', (q) => q.eq('collectionId', collectionId))
       .unique();
     const posters = await ctx.db
       .query('posters')
-      .withIndex('by_competition_active', (q) => q.eq('competitionId', competitionId).eq('active', true))
+      .withIndex('by_collection_active', (q) => q.eq('collectionId', collectionId).eq('active', true))
       .collect();
 
     // Located votes per country, by segment: a few rows per country.
     const countryRows = await ctx.db
       .query('countries')
-      .withIndex('by_code', (q) => q.eq('competitionId', competitionId))
+      .withIndex('by_code', (q) => q.eq('collectionId', collectionId))
       .collect();
     const byCode = new Map<string, { code: string; all: number; designers: number; others: number }>();
     for (const row of countryRows) {
@@ -50,7 +50,7 @@ export const overview = query({
     // said so, then others, else 'unknown': they voted before we asked).
     const voters = await ctx.db
       .query('voters')
-      .withIndex('by_competition_voter', (q) => q.eq('competitionId', competitionId))
+      .withIndex('by_collection_voter', (q) => q.eq('collectionId', collectionId))
       .take(VOTER_CAP + 1);
     let depth: { votes: number; designers: number; others: number; unknown: number }[] | null = null;
     if (voters.length <= VOTER_CAP) {
@@ -63,9 +63,9 @@ export const overview = query({
       depth = [...byVotes.values()].sort((a, b) => a.votes - b.votes);
     }
 
-    const { slug, title, active } = competition;
+    const { slug, title, active } = collection;
     return {
-      competition: { slug, title, active },
+      collection: { slug, title, active },
       hours: hours.map(({ hour, all, designers, others }) => ({ hour, all, designers, others })),
       counts: progress?.counts ?? null,
       tally: progress

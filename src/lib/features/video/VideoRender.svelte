@@ -9,7 +9,7 @@
   import { AT, BEAT_MS, CUES, plan, type Spawn } from './timeline';
 
   // The winner video for `pnpm video` (scripts/render-video.mjs) to render, one frame at a time.
-  // It loads the competition in the URL (`?competition=<slug>&name=<name in the question>`),
+  // It loads the collection in the URL (`?collection=<slug>&name=<name in the question>`),
   // preloads its posters, takes over the page's clock, and then waits on `window.__video`: the
   // script starts it, moves it on a frame at a time and screenshots each one, and asks for the
   // music separately. Open it in a window the video's size (540 × 960 at 2×) for a 1080 × 1920 frame.
@@ -17,7 +17,7 @@
   type VideoApi = {
     /** Seconds of video. */
     seconds: number;
-    competition: string;
+    collection: string;
     votes: number;
     top: string[];
     /** Starts the video at its first frame. */
@@ -31,9 +31,9 @@
   const expose = (status: Status) => ((window as unknown as { __video: Status }).__video = status);
 
   const params = page.url.searchParams;
-  const slug = params.get('competition') ?? undefined;
+  const slug = params.get('collection') ?? undefined;
   const data = useVideoData(() => slug);
-  const name = $derived(params.get('name') || data.competition?.title || '');
+  const name = $derived(params.get('name') || data.collection?.title || '');
 
   type Ranked = NonNullable<typeof data.ranked>;
   // Fixed when the video starts, so votes coming in while it renders don't change it.
@@ -43,16 +43,16 @@
 
   $effect(() => {
     if (data.error) expose({ ready: false, error: data.error.message });
-    else if (data.missing) expose({ ready: false, error: `No competition "${slug ?? 'active'}"` });
-    else if (data.ranked && data.competition && !prepared) {
+    else if (data.missing) expose({ ready: false, error: `No collection "${slug ?? 'active'}"` });
+    else if (data.ranked && data.collection && !prepared) {
       prepared = true;
-      prepare(data.ranked, data.competition.title, data.votes);
+      prepare(data.ranked, data.collection.title, data.votes);
     }
   });
 
   async function prepare(ranked: Ranked, title: string, votes: number) {
     images = await preloadPosters(ranked);
-    await document.fonts.load('64px "Remi Pop"');
+    await Promise.all([document.fonts.load('64px "Remi Pop"'), document.fonts.load('800 56px "Bricolage Grotesque"')]);
     // A moment for the polka dots to load their drawings and start.
     await new Promise((resolve) => setTimeout(resolve, 500));
     const clock = takeOverClock();
@@ -61,7 +61,7 @@
       ready: true,
       api: {
         seconds,
-        competition: title,
+        collection: title,
         votes,
         top: ranked.slice(0, 3).map((p) => p.title),
         async start() {
@@ -109,7 +109,7 @@
   }
 </script>
 
-<Stage>
+<Stage startAt={run?.startAt}>
   {#if run}
     <Reel startAt={run.startAt} spawns={run.spawns} top={run.top} {name} votes={run.votes} sfx={false} />
   {/if}

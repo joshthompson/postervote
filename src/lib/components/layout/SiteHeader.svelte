@@ -9,7 +9,7 @@
 
   // Mute on the left, logo in the middle, shortcut and menu on the right.
   // On phones it stacks into one column with the two round buttons pinned to the corners.
-  // `withMenu` is off until Convex is configured, since the menu lists competitions from it.
+  // `withMenu` is off until Convex is configured, since the pages it links to need it.
 
   let { withMenu = true }: { withMenu?: boolean } = $props();
 </script>

@@ -51,3 +51,6 @@ export function orderPair(x: Id<'posters'>, y: Id<'posters'>) {
 export function groupOf(designer: boolean | undefined): Exclude<Segment, 'all'> | null {
   return designer === true ? 'designers' : designer === false ? 'others' : null;
 }
+
+/** An archived collection, as archives/<slug>/results.json keeps it (see archive.ts). */
+export type { Archive } from './archive';

@@ -5,9 +5,15 @@
   // Everything is drawn onto a low-res canvas with smoothing off, then upscaled with
   // `image-rendering: pixelated` so every dot keeps its crunchy pixel edges.
   // `contained` fills the nearest positioned parent instead of the viewport; `interactive` off
-  // leaves the pointer out (e.g. in a video).
+  // leaves the pointer out (e.g. in a video). `loop` repeats the dots exactly every `seconds` from
+  // `start` (a performance.now() time), so a looping video's last frame runs into its first.
 
-  let { contained = false, interactive = true }: { contained?: boolean; interactive?: boolean } = $props();
+  type Loop = { start: number; seconds: number };
+  let {
+    contained = false,
+    interactive = true,
+    loop
+  }: { contained?: boolean; interactive?: boolean; loop?: Loop } = $props();
 
   const SPRITE_URLS = Object.values(
     import.meta.glob('../../assets/dots/*.png', { eager: true, query: '?url', import: 'default' })
@@ -30,6 +36,8 @@
     offset: number;
     on: number;
     cycle: number;
+    /** When looping: the shape and colour for each of its cycles in a loop. */
+    looped?: Sprite[];
   };
 
   let field: HTMLDivElement;
@@ -143,7 +151,8 @@
     }
 
     function draw(time: number) {
-      const t = time / 1000;
+      const l = loop;
+      const t = l ? ((((time - l.start) / 1000) % l.seconds) + l.seconds) % l.seconds : time / 1000;
       pointer.x += (pointer.tx - pointer.x) * 0.08;
       pointer.y += (pointer.ty - pointer.y) * 0.08;
       const pX = pointer.x / px;
@@ -153,9 +162,14 @@
       ctx.clearRect(0, 0, cw, ch);
       for (const d of dots) {
         // Each dot runs its own fade cycle: fade in, hold, fade out, rest invisible, repeat.
-        const progress = t / d.period + d.offset;
+        // Looping, a whole number of cycles fits in the loop, with the same shapes each time round.
+        const laps = l ? Math.max(1, Math.round(l.seconds / d.period)) : 0;
+        const progress = t / (l ? l.seconds / laps : d.period) + d.offset;
         const cycle = Math.floor(progress);
-        if (cycle !== d.cycle) {
+        if (l) {
+          d.looped ??= [];
+          d.sprite = d.looped[cycle % laps] ??= randomSprite();
+        } else if (cycle !== d.cycle) {
           // Fresh shape and colour each time a dot comes back.
           if (d.cycle !== -1) d.sprite = randomSprite();
           d.cycle = cycle;

@@ -1,17 +1,16 @@
-import { useQuery } from 'convex-svelte';
-import { api } from '$convex/api';
+import { useLiveCounts, useSnapshot } from '$lib/features/collections/data.svelte';
 import { rank } from '$lib/features/results/hydrate';
 import { usePosters } from '$lib/services/posters.svelte';
 import { posterSrc } from '$lib/utils/images';
 
-// What the winner video shows: a competition (by slug, or the active one), its posters ranked
+// What the winner video shows: a collection (by slug, or the active one), its posters ranked
 // by everyone's votes, and how many votes there were. Read from the tallies like the rankings,
-// so up to 15 minutes behind for the active competition.
+// so up to 15 minutes behind for the active collection, or from an archived one's archive.
 
-export function useVideoData(competition: () => string | undefined) {
-  const posterList = usePosters(competition);
-  const snap = useQuery(api.results.snapshot, () => ({ segment: 'all' as const, competition: competition() }));
-  const counts = useQuery(api.results.live, () => ({ competition: competition() }));
+export function useVideoData(collection: () => string | undefined) {
+  const posterList = usePosters(collection);
+  const snap = useSnapshot(() => ({ segment: 'all' as const, collection: collection() }));
+  const counts = useLiveCounts(() => ({ collection: collection() }));
 
   const ranked = $derived(
     posterList.data && snap.data ? rank(posterList.data, snap.data.snapshot?.scores ?? []) : undefined
@@ -19,10 +18,10 @@ export function useVideoData(competition: () => string | undefined) {
 
   return {
     /** Its slug, title and whether it's active; undefined while loading. */
-    get competition() {
-      return snap.data?.competition;
+    get collection() {
+      return snap.data?.collection;
     },
-    /** True when there's no such competition. */
+    /** True when there's no such collection. */
     get missing() {
       return snap.data === null;
     },

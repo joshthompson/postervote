@@ -1,13 +1,15 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import PolkaDots from '$lib/components/layout/PolkaDots.svelte';
-  import { HEIGHT, WIDTH } from './timeline';
+  import { AT, BEAT_MS, HEIGHT, WIDTH } from './timeline';
 
   // The video's frame over a black screen that covers the whole page, header and all: the
   // polka dots, with the reel on top (`children`), as large as fits the window. In a window the
   // video's size, that's one CSS pixel per video pixel. `hint` sits in the black under it.
+  // `startAt` is when the video starts (a performance.now() time), so the dots loop with it.
 
-  let { children, hint }: { children?: Snippet; hint?: Snippet } = $props();
+  let { startAt, children, hint }: { startAt?: number; children?: Snippet; hint?: Snippet } = $props();
+  const loop = $derived(startAt === undefined ? undefined : { start: startAt, seconds: (AT.end * BEAT_MS) / 1000 });
 
   let innerWidth = $state(WIDTH);
   let innerHeight = $state(HEIGHT);
@@ -29,7 +31,7 @@
       (innerHeight - HEIGHT) / 2
     )}px; transform: scale({scale})"
   >
-    <PolkaDots contained interactive={false} />
+    <PolkaDots contained interactive={false} {loop} />
     {@render children?.()}
   </div>
   {#if hint}<p class="hint">{@render hint()}</p>{/if}

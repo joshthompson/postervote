@@ -1,9 +1,8 @@
-import { internalMutation, mutation, query } from './_generated/server';
-import { internal } from './_generated/api';
+import { mutation, query } from './_generated/server';
 import { ConvexError, v } from 'convex/values';
-import { getActive } from './competitions';
+import { getActive } from './collections';
 import { orderPair } from './shared';
-import { getProgress, requestRun, startRebuild } from './tally';
+import { getProgress, requestRun } from './tally';
 
 /** How many votes this voter has cast. */
 export const count = query({
@@ -35,11 +34,11 @@ export const cast = mutation({
     const winner = await ctx.db.get(winnerId);
     const loser = await ctx.db.get(loserId);
     if (!winner || !loser) throw new ConvexError('Poster not found');
-    const competition = await getActive(ctx);
+    const collection = await getActive(ctx);
     if (
-      !competition ||
-      winner.competitionId !== competition._id ||
-      loser.competitionId !== competition._id ||
+      !collection ||
+      winner.collectionId !== collection._id ||
+      loser.collectionId !== collection._id ||
       !winner.active ||
       !loser.active
     ) {
@@ -48,7 +47,7 @@ export const cast = mutation({
 
     // This pair's votes so far: what the tally has counted, plus the votes it hasn't reached yet.
     // While a rebuild is clearing the old tally, count them all from the votes instead.
-    const progress = await getProgress(ctx, competition._id);
+    const progress = await getProgress(ctx, collection._id);
     const counted = progress && !progress.clearing;
     const cursor = counted ? progress.cursor : 0;
     const [aId, bId] = orderPair(winnerId, loserId);
@@ -69,7 +68,7 @@ export const cast = mutation({
     const loserVotes = (tallied ? (winnerIsA ? tallied.bWins : tallied.aWins) : 0) + (await untallied(loserId, winnerId)).length;
 
     await ctx.db.insert('votes', {
-      competitionId: competition._id,
+      collectionId: collection._id,
       winnerId,
       loserId,
       voterId: voterId.slice(0, 64),
@@ -81,7 +80,7 @@ export const cast = mutation({
     // Tick the live counts the rankings page shows between tally runs.
     const live = await ctx.db
       .query('live')
-      .withIndex('by_competition', (q) => q.eq('competitionId', competition._id))
+      .withIndex('by_collection', (q) => q.eq('collectionId', collection._id))
       .unique();
     const add = { all: 1, designers: designer === true ? 1 : 0, others: designer === false ? 1 : 0 };
     if (live) {
@@ -91,42 +90,10 @@ export const cast = mutation({
         others: live.others + add.others
       });
     } else {
-      await ctx.db.insert('live', { competitionId: competition._id, ...add });
+      await ctx.db.insert('live', { collectionId: collection._id, ...add });
     }
 
-    await requestRun(ctx, competition._id, { progress });
+    await requestRun(ctx, collection._id, { progress });
     return { winnerVotes, loserVotes };
-  }
-});
-
-const BACKFILL_BATCH = 500;
-
-/**
- * Tag votes from before competitions with their posters' competition, a batch at a time. Those
- * votes are older than anything the tally has reached, so each competition that gained some is
- * re-tallied at the end.
- */
-export const backfill = internalMutation({
-  args: { tagged: v.optional(v.array(v.id('competitions'))) },
-  handler: async (ctx, args) => {
-    const votes = await ctx.db
-      .query('votes')
-      .withIndex('by_competition', (q) => q.eq('competitionId', undefined))
-      .take(BACKFILL_BATCH);
-    const tagged = new Set(args.tagged ?? []);
-    let taggedNow = 0;
-    for (const vote of votes) {
-      const winner = await ctx.db.get(vote.winnerId);
-      if (!winner?.competitionId) continue;
-      await ctx.db.patch(vote._id, { competitionId: winner.competitionId });
-      tagged.add(winner.competitionId);
-      taggedNow++;
-    }
-    // Stop if nothing could be tagged, so untaggable votes can't loop forever.
-    if (votes.length === BACKFILL_BATCH && taggedNow) {
-      await ctx.scheduler.runAfter(0, internal.votes.backfill, { tagged: [...tagged] });
-    } else {
-      for (const competitionId of tagged) await startRebuild(ctx, competitionId);
-    }
   }
 });

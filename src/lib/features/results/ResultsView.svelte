@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { useQuery } from 'convex-svelte';
   import { untrack } from 'svelte';
   import { pushState } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { api } from '$convex/api';
   import Loader from '$lib/components/ui/Loader.svelte';
+  import { isArchived } from '$lib/features/collections/archives.svelte';
+  import { useLiveCounts, useSnapshot } from '$lib/features/collections/data.svelte';
   import { i18n } from '$lib/i18n/index.svelte';
   import { track } from '$lib/services/analytics';
   import { usePosters } from '$lib/services/posters.svelte';
@@ -25,38 +25,37 @@
   import type { ShareOutcome } from '$lib/features/share/share.svelte';
   import type { LinkTo, RankedPoster, View } from './types';
 
-  // A competition's results: the active one, or the one named by `slug` (usually archived).
-  // Each view reads its segment's snapshot (rebuilt at most every 15 minutes as votes come in), the
-  // live vote counts, and the poster list the snapshots' ids are joined to. Disagreements
-  // compares the designers' and non-designers' snapshots, with everyone's kept for the modal.
+  // A collection's results: the active one, or the one named by `slug`. Each view reads its
+  // segment's snapshot (rebuilt at most every 15 minutes as votes come in), the live vote counts,
+  // and the poster list the snapshots' ids are joined to, from Convex or, for an archived
+  // collection, from its archive. Disagreements compares the designers' and non-designers'
+  // snapshots, with everyone's kept for the modal.
 
   let { slug }: { slug?: string } = $props();
 
   let view = $state<View>('all');
   // The voter group the rankings are showing (everyone's, behind the disagreements).
   const segment = $derived(view === 'disagree' ? 'all' : view);
-  // Live queries pause while the tab has been in the background for a while.
-  const live = <A,>(args: A) => (visibility.away ? ('skip' as const) : args);
+  // Live queries pause while the tab has been in the background for a while (an archive never changes).
+  const live = <A,>(args: A) => (visibility.away && !isArchived(slug) ? ('skip' as const) : args);
 
   const posterList = usePosters(() => slug);
-  const main = useQuery(api.results.snapshot, () => live({ segment, competition: slug }), { keepPreviousData: true });
-  const counts = useQuery(api.results.live, () => live({ competition: slug }), { keepPreviousData: true });
-  const designerSnap = useQuery(
-    api.results.snapshot,
-    () => (view === 'disagree' ? live({ segment: 'designers', competition: slug }) : 'skip'),
+  const main = useSnapshot(() => live({ segment, collection: slug }), { keepPreviousData: true });
+  const counts = useLiveCounts(() => live({ collection: slug }), { keepPreviousData: true });
+  const designerSnap = useSnapshot(
+    () => (view === 'disagree' ? live({ segment: 'designers' as const, collection: slug }) : 'skip'),
     { keepPreviousData: true }
   );
-  const otherSnap = useQuery(
-    api.results.snapshot,
-    () => (view === 'disagree' ? live({ segment: 'others', competition: slug }) : 'skip'),
+  const otherSnap = useSnapshot(
+    () => (view === 'disagree' ? live({ segment: 'others' as const, collection: slug }) : 'skip'),
     { keepPreviousData: true }
   );
 
   const t = $derived(i18n.t.results);
   const posters = $derived(posterList.data ?? []);
   const posterById = $derived(new Map(posters.map((p) => [p._id, p])));
-  const competition = $derived(main.data?.competition);
-  const archived = $derived(competition?.active === false);
+  const collection = $derived(main.data?.collection);
+  const archived = $derived(collection?.active === false);
   const missing = $derived(main.data === null);
   const error = $derived(main.error ?? posterList.error ?? counts.error);
   // While a newly picked group loads, the last group's snapshot stays on screen (keepPreviousData),
@@ -73,7 +72,7 @@
   );
   const split = $derived(
     view === 'disagree' &&
-      competition &&
+      collection &&
       posterList.data &&
       designerSnap.data !== undefined &&
       otherSnap.data !== undefined
@@ -84,9 +83,9 @@
 
   // Every poster links to its own page. A plain click opens it here in the modal instead, with
   // the page's URL in the address bar to share, and Back closes it (shallow routing). Only
-  // shown once the competition has loaded, since the URL names it.
+  // shown once the collection has loaded, since the URL names it.
   const names = $derived(posterNames(posters));
-  const hrefFor = (p: { _id: RankedPoster['_id'] }) => posterHref(competition!.slug, names.get(p._id)!);
+  const hrefFor = (p: { _id: RankedPoster['_id'] }) => posterHref(collection!.slug, names.get(p._id)!);
   const linkTo: LinkTo = (p, placement) => {
     const href = hrefFor(p);
     return {
@@ -96,7 +95,7 @@
         e.preventDefault();
         pushState(href, { poster: p._id });
         track('poster_details_opened', {
-          competition: competition!.slug,
+          collection: collection!.slug,
           poster_id: p._id,
           poster_title: posterById.get(p._id)!.title,
           poster_rank: data?.posters.find((r) => r._id === p._id)?.rank,
@@ -109,13 +108,13 @@
 
   // The poster open in the modal, looked up in the live list so its numbers keep updating.
   const openPoster = $derived(data?.posters.find((p) => p._id === page.state.poster) ?? null);
-  const openHref = $derived(openPoster && competition ? hrefFor(openPoster) : undefined);
+  const openHref = $derived(openPoster && collection ? hrefFor(openPoster) : undefined);
   // Closing it goes back to the rankings' URL; after Back, it's already there.
   const onclose = () => page.state.poster && history.back();
   const onshare = (outcome: ShareOutcome) =>
     openPoster &&
     track('poster_shared', {
-      competition: competition?.slug,
+      collection: collection?.slug,
       poster_id: openPoster._id,
       poster_title: openPoster.title,
       placement: 'rankings_modal',
@@ -123,7 +122,7 @@
     });
 
   const sub = $derived.by(() => {
-    if (missing) return slug ? t.noCompetitionHere : t.noCompetition;
+    if (missing) return slug ? t.noCollectionHere : t.noCollection;
     if (view === 'disagree') return t.disagreeSub;
     if (!data) return t.tallying;
     return archived ? t.final(data.stats.totalVotes, segment) : t.live(data.stats.totalVotes, segment);
@@ -137,19 +136,20 @@
       { label: t.stats.votes, value: s.totalVotes },
       { label: t.stats.voters, value: s.voters },
       { label: t.stats.posters, value: s.posterCount },
-      { label: t.stats.today, value: s.today },
+      // A closed collection has no votes today.
+      ...(archived ? [] : [{ label: t.stats.today, value: s.today }]),
       { label: t.stats.explored, value: coverage, decimals: coverage < 10 ? 1 : 0, suffix: '%' }
     ];
   });
 </script>
 
 <svelte:head>
-  <title>{competition ? `${competition.title} · ` : ''}{t.title} · {i18n.t.brand}</title>
+  <title>{collection ? `${collection.title} · ` : ''}{t.title} · {i18n.t.brand}</title>
 </svelte:head>
 
 <ResultsHero
   heading={t.heading}
-  competition={competition && `${competition.title}${archived ? ` · ${t.archived}` : ''}`}
+  collection={collection && `${collection.title}${archived ? ` · ${t.archived}` : ''}`}
   {sub}
 />
 
@@ -159,7 +159,7 @@
   <ViewFilters
     bind:value={view}
     onchange={(v, previous) =>
-      track('rankings_view_changed', { competition: competition?.slug, view: v, previous_view: previous })}
+      track('rankings_view_changed', { collection: collection?.slug, view: v, previous_view: previous })}
   />
 
   {#if view === 'disagree'}
@@ -199,7 +199,7 @@
   {/if}
 {/if}
 
-<PosterDetail poster={openPoster} {segment} {posterById} shareHref={openHref} {onshare} {onclose} />
+<PosterDetail poster={openPoster} {segment} collection={slug} {posterById} shareHref={openHref} {onshare} {onclose} />
 
 <style>
   .loading {

@@ -7,6 +7,12 @@ export type Segment = 'all' | 'designers' | 'others';
 
 const num = (n: number) => n.toLocaleString('en');
 const s = (n: number) => (n === 1 ? '' : 's');
+/** "September 2026 – now", or one month when it opened and closed in it. */
+export const period = (lang: string, from: number, to: number | null, now: string) => {
+  const month = (ms: number) => new Date(ms).toLocaleDateString(lang, { month: 'long', year: 'numeric' });
+  if (to === null) return `${month(from)} – ${now}`;
+  return month(from) === month(to) ? month(from) : `${month(from)} – ${month(to)}`;
+};
 const by = (segment: Segment) =>
   segment === 'designers' ? ' by designers' : segment === 'others' ? ' by non-designers' : '';
 
@@ -41,7 +47,7 @@ export const en = {
     rankings: 'Rankings',
     about: 'About',
     settings: 'Settings',
-    past: 'Past competitions'
+    collections: 'Collections'
   },
 
   vote: {
@@ -187,6 +193,23 @@ export const en = {
     rankings: 'See the rankings'
   },
 
+  collections: {
+    title: 'Collections',
+    // The big two-word heading.
+    heading: ['The', 'Collections'],
+    intro: 'Every collection of posters put to the vote, and how each one ended.',
+    live: 'Live',
+    votingNow: 'Voting now',
+    vote: 'Vote →',
+    period: (from: number, to: number | null) => period('en', from, to, 'now'),
+    votes: (n: number) => `${num(n)} vote${s(n)}`,
+    posters: (n: number) => `${num(n)} poster${s(n)}`,
+    winner: 'Winner',
+    leading: 'In the lead',
+    none: 'No collections yet.',
+    loadError: (message: string) => `Couldn’t load the collections: ${message}`
+  },
+
   results: {
     title: 'Rankings',
     // The big two-word heading.
@@ -199,8 +222,8 @@ export const en = {
     },
     viewsLabel: 'Whose votes to show',
     archived: 'Archived',
-    noCompetitionHere: 'There’s no competition here.',
-    noCompetition: 'No competition is running yet.',
+    noCollectionHere: 'There’s no collection here.',
+    noCollection: 'No collection is live yet.',
     disagreeSub: 'Where designers and everyone else part ways.',
     final: (votes: number, segment: Segment) => `Final results from ${num(votes)} head-to-heads${by(segment)}.`,
     live: (votes: number, segment: Segment) =>

@@ -116,7 +116,7 @@ export function disagreements(posters: PosterInfo[], designers: Snapshot | null,
   };
 }
 
-/** A poster's detail with its opponents' titles and images, dropping any no longer in the competition. */
+/** A poster's detail with its opponents' titles and images, dropping any no longer in the collection. */
 export function detail(data: Detail, byId: Map<PosterInfo['_id'], PosterInfo>) {
   return {
     ...data,

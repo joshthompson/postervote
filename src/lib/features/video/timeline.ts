@@ -16,7 +16,7 @@ export const AT = {
   logo: 0,
   /** It flies off and the small one lands at the top. */
   logoSmall: 5,
-  /** "What was the best poster of…", then the competition's name. */
+  /** "What was the best poster of…", then the collection's name. */
   question: 6,
   name: 8,
   questionOut: 20,
@@ -38,7 +38,11 @@ export const AT = {
   /** "And the winner is…" */
   drumroll: 74,
   winner: 80,
-  /** The last frame: the winner holds until here. */
+  /** The winner's screen spins away for the site's address… */
+  outro: 89,
+  /** …which drops away with the logo, leaving the bare stage the video starts on, so it loops. */
+  outroOut: 95,
+  /** The end, which is the start again: a whole number of the music's 4-bar loops. */
   end: 96
 } as const;
 
@@ -46,7 +50,7 @@ export const AT = {
 export const POSTER_IN = 1;
 export const PARK = 7;
 
-/** Beats the zap and stab sound on: the competition's name, the votes being in, each reveal. */
+/** Beats the zap and stab sound on: the collection's name, the votes being in, each reveal. */
 export const CUES = [AT.name, AT.votesIn, AT.third + POSTER_IN, AT.second + POSTER_IN, AT.winner];
 
 export type Spawn = {

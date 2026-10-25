@@ -1,7 +1,7 @@
 import { resolve } from '$app/paths';
 import type { PosterInfo } from '$lib/services/posters.svelte';
 
-// Each poster has its own page at /poster/<competition slug>/<name>, where the name comes from its
+// Each poster has its own page at /poster/<collection slug>/<name>, where the name comes from its
 // title, e.g. "Dungen – Vidrig Vår (Album)" → "dungen-vidrig-var-album". Renaming a poster
 // changes its link.
 
@@ -30,8 +30,8 @@ export function posterNames(posters: PosterInfo[]) {
 }
 
 /** The URL of a poster's own page. */
-export const posterHref = (competition: string, name: string) =>
-  resolve('/poster/[competition]/[name]', { competition, name });
+export const posterHref = (collection: string, name: string) =>
+  resolve('/poster/[collection]/[name]', { collection, name });
 
 /** A click the page should handle itself; with a modifier key the browser opens the link its own way. */
 export const plainClick = (e: MouseEvent) => !(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey);

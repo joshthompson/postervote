@@ -4,7 +4,7 @@ import { v } from 'convex/values';
 import type { Doc, Id, TableNames } from './_generated/dataModel';
 import type { WithOptionalSystemFields, WithoutSystemFields } from 'convex/server';
 import { bradleyTerry } from './bradleyTerry';
-import { getActive } from './competitions';
+import { getActive } from './collections';
 import {
   HOUR_MS,
   LOCAL_MIN_VOTES,
@@ -56,10 +56,10 @@ const segmentsOf = (vote: Doc<'votes'>): Segment[] => {
   return group ? ['all', group] : ['all'];
 };
 
-export const getProgress = (ctx: MutationCtx, competitionId: Id<'competitions'>) =>
+export const getProgress = (ctx: MutationCtx, collectionId: Id<'collections'>) =>
   ctx.db
     .query('progress')
-    .withIndex('by_competition', (q) => q.eq('competitionId', competitionId))
+    .withIndex('by_collection', (q) => q.eq('collectionId', collectionId))
     .unique();
 
 /**
@@ -69,15 +69,15 @@ export const getProgress = (ctx: MutationCtx, competitionId: Id<'competitions'>)
  */
 export async function requestRun(
   ctx: MutationCtx,
-  competitionId: Id<'competitions'>,
+  collectionId: Id<'collections'>,
   { progress, now: immediately = false, stale = false }: { progress?: Doc<'progress'> | null; now?: boolean; stale?: boolean } = {}
 ) {
   const now = Date.now();
-  const p = progress === undefined ? await getProgress(ctx, competitionId) : progress;
+  const p = progress === undefined ? await getProgress(ctx, collectionId) : progress;
   if (!p) {
     const at = now + (immediately ? 0 : FIRST_DELAY_MS);
     await ctx.db.insert('progress', {
-      competitionId,
+      collectionId,
       cursor: 0,
       pending: true,
       scheduledFor: at,
@@ -86,23 +86,35 @@ export async function requestRun(
       stale: true,
       counts: emptyCounts()
     });
-    await ctx.scheduler.runAt(at, internal.tally.run, { competitionId });
+    await ctx.scheduler.runAt(at, internal.tally.run, { collectionId });
     return;
   }
   if (stale && !p.stale) await ctx.db.patch(p._id, { stale: true });
   if (!immediately && p.pending && p.scheduledFor > now - STUCK_MS) return;
   const at = immediately ? now : Math.max(now + FIRST_DELAY_MS, p.lastRunAt + REFRESH_MS);
   await ctx.db.patch(p._id, { pending: true, scheduledFor: at });
-  await ctx.scheduler.runAt(at, internal.tally.run, { competitionId });
+  await ctx.scheduler.runAt(at, internal.tally.run, { collectionId });
 }
 
-/** Throw away a competition's tallies and count every vote again, e.g. after merging posters. */
-export async function startRebuild(ctx: MutationCtx, competitionId: Id<'competitions'>) {
-  const p = await getProgress(ctx, competitionId);
+/** Throw away a collection's tallies and count every vote again, e.g. after merging posters. */
+export async function startRebuild(ctx: MutationCtx, collectionId: Id<'collections'>) {
+  const p = await getProgress(ctx, collectionId);
   const reset = { cursor: 0, pending: true, scheduledFor: Date.now(), clearing: true, stale: true, counts: emptyCounts() };
   if (p) await ctx.db.patch(p._id, reset);
-  else await ctx.db.insert('progress', { competitionId, lastRunAt: 0, ...reset });
-  await ctx.scheduler.runAfter(0, internal.tally.run, { competitionId });
+  else await ctx.db.insert('progress', { collectionId, lastRunAt: 0, ...reset });
+  await ctx.scheduler.runAfter(0, internal.tally.run, { collectionId });
+}
+
+/**
+ * Tally the last votes of a collection whose voting has just closed: one run, once they've
+ * settled, reaches them all, as no more can be cast.
+ */
+export async function settle(ctx: MutationCtx, collectionId: Id<'collections'>) {
+  const p = await getProgress(ctx, collectionId);
+  if (!p || p.clearing) return;
+  const at = Date.now() + SETTLE_MS + 1000;
+  await ctx.db.patch(p._id, { pending: true, scheduledFor: at });
+  await ctx.scheduler.runAt(at, internal.tally.run, { collectionId });
 }
 
 /**
@@ -173,17 +185,17 @@ type Favourite = NonNullable<Doc<'cities'>['best']>;
  */
 async function favourite(
   ctx: MutationCtx,
-  place: { competitionId: Id<'competitions'>; segment: Segment; country: string; city: string },
+  place: { collectionId: Id<'collections'>; segment: Segment; country: string; city: string },
   among?: Set<Id<'posters'>>
 ): Promise<Favourite | null> {
-  const { competitionId, segment, country, city } = place;
+  const { collectionId, segment, country, city } = place;
   let below: number | undefined;
   for (;;) {
     const top = await ctx.db
       .query('cityPosters')
       .withIndex('by_city_wins', (q) => {
         const withWins = q
-          .eq('competitionId', competitionId)
+          .eq('collectionId', collectionId)
           .eq('segment', segment)
           .eq('country', country)
           .eq('city', city)
@@ -196,7 +208,7 @@ async function favourite(
     const tied = await ctx.db
       .query('cityPosters')
       .withIndex('by_city_wins', (q) =>
-        q.eq('competitionId', competitionId).eq('segment', segment).eq('country', country).eq('city', city).eq('wins', top.wins)
+        q.eq('collectionId', collectionId).eq('segment', segment).eq('country', country).eq('city', city).eq('wins', top.wins)
       )
       .collect();
     const best = tied.filter((r) => !among || among.has(r.posterId)).sort((a, b) => a.matches - b.matches)[0];
@@ -221,7 +233,7 @@ class Tally {
 
   constructor(
     private ctx: MutationCtx,
-    private competitionId: Id<'competitions'>,
+    private collectionId: Id<'collections'>,
     public counts: Counts
   ) {
     this.standings = new Rows(ctx, 'standings');
@@ -237,23 +249,23 @@ class Tally {
   async load() {
     const all = await this.ctx.db
       .query('standings')
-      .withIndex('by_competition', (q) => q.eq('competitionId', this.competitionId))
+      .withIndex('by_collection', (q) => q.eq('collectionId', this.collectionId))
       .collect();
     this.standings.seed(all, (s) => s.posterId);
   }
 
   private standing(posterId: Id<'posters'>) {
-    const competitionId = this.competitionId;
+    const collectionId = this.collectionId;
     return this.standings.get(
       posterId,
       async () => null,
-      () => ({ competitionId, posterId, active: true, all: freshScore(), designers: freshScore(), others: freshScore() })
+      () => ({ collectionId, posterId, active: true, all: freshScore(), designers: freshScore(), others: freshScore() })
     );
   }
 
   async add(vote: Doc<'votes'>) {
     const { db } = this.ctx;
-    const competitionId = this.competitionId;
+    const collectionId = this.collectionId;
     const segments = segmentsOf(vote);
     const winner = (await this.standing(vote.winnerId)).value;
     const loser = (await this.standing(vote.loserId)).value;
@@ -283,7 +295,7 @@ class Tally {
             .query('matchups')
             .withIndex('by_pair', (q) => q.eq('segment', segment).eq('aId', aId).eq('bId', bId))
             .unique(),
-        () => ({ competitionId, segment, aId, bId, aWins: 0, bWins: 0, contested: false, closeKey: 0, lopKey: 0 })
+        () => ({ collectionId, segment, aId, bId, aWins: 0, bWins: 0, contested: false, closeKey: 0, lopKey: 0 })
       );
       if (m.isNew) counts.pairs++;
       if (vote.winnerId === aId) m.value.aWins++;
@@ -300,9 +312,9 @@ class Tally {
       () =>
         db
           .query('voters')
-          .withIndex('by_competition_voter', (q) => q.eq('competitionId', competitionId).eq('voterId', vote.voterId))
+          .withIndex('by_collection_voter', (q) => q.eq('collectionId', collectionId).eq('voterId', vote.voterId))
           .unique(),
-      () => ({ competitionId, voterId: vote.voterId, votes: 0, designers: false, others: false })
+      () => ({ collectionId, voterId: vote.voterId, votes: 0, designers: false, others: false })
     );
     if (voter.isNew) this.counts.all.voters++;
     voter.value.votes++;
@@ -318,9 +330,9 @@ class Tally {
       () =>
         db
           .query('hours')
-          .withIndex('by_hour', (q) => q.eq('competitionId', competitionId).eq('hour', hour))
+          .withIndex('by_hour', (q) => q.eq('collectionId', collectionId).eq('hour', hour))
           .unique(),
-      () => ({ competitionId, hour, all: 0, designers: 0, others: 0 })
+      () => ({ collectionId, hour, all: 0, designers: 0, others: 0 })
     );
     for (const segment of segments) h.value[segment]++;
   }
@@ -328,7 +340,7 @@ class Tally {
   /** Count a located vote towards its country, its city, and both posters' records there. */
   private async place(vote: Doc<'votes'>, segment: Segment) {
     const { db } = this.ctx;
-    const competitionId = this.competitionId;
+    const collectionId = this.collectionId;
     const code = vote.country!;
     const counts = this.counts[segment];
     counts.located++;
@@ -338,9 +350,9 @@ class Tally {
       () =>
         db
           .query('countries')
-          .withIndex('by_code', (q) => q.eq('competitionId', competitionId).eq('segment', segment).eq('code', code))
+          .withIndex('by_code', (q) => q.eq('collectionId', collectionId).eq('segment', segment).eq('code', code))
           .unique(),
-      () => ({ competitionId, segment, code, votes: 0 })
+      () => ({ collectionId, segment, code, votes: 0 })
     );
     country.value.votes++;
 
@@ -353,10 +365,10 @@ class Tally {
         db
           .query('cities')
           .withIndex('by_city', (q) =>
-            q.eq('competitionId', competitionId).eq('segment', segment).eq('country', code).eq('city', city)
+            q.eq('collectionId', collectionId).eq('segment', segment).eq('country', code).eq('city', city)
           )
           .unique(),
-      () => ({ competitionId, segment, country: code, city, votes: 0, best: null })
+      () => ({ collectionId, segment, country: code, city, votes: 0, best: null })
     );
     if (c.isNew) counts.cities++;
     c.value.votes++;
@@ -372,14 +384,14 @@ class Tally {
             .query('cityPosters')
             .withIndex('by_city_poster', (q) =>
               q
-                .eq('competitionId', competitionId)
+                .eq('collectionId', collectionId)
                 .eq('segment', segment)
                 .eq('country', code)
                 .eq('city', city)
                 .eq('posterId', posterId)
             )
             .unique(),
-        () => ({ competitionId, segment, country: code, city, posterId, wins: 0, matches: 0 })
+        () => ({ collectionId, segment, country: code, city, posterId, wins: 0, matches: 0 })
       );
       r.value.matches++;
       if (won) r.value.wins++;
@@ -412,7 +424,7 @@ class Tally {
   async recheckFavourites() {
     for (const key of this.recheck) {
       const city = this.cities.edit(key)!;
-      city.best = await favourite(this.ctx, city);
+      city.best = await favourite(this.ctx, { ...city, collectionId: this.collectionId });
     }
     if (this.recheck.size) await this.cities.save();
   }
@@ -425,7 +437,7 @@ class Tally {
     const nowHour = Math.floor(now / HOUR_MS);
     const hours = await this.ctx.db
       .query('hours')
-      .withIndex('by_hour', (q) => q.eq('competitionId', this.competitionId).gte('hour', nowHour - 24))
+      .withIndex('by_hour', (q) => q.eq('collectionId', this.collectionId).gte('hour', nowHour - 24))
       .collect();
     const recent: Record<Segment, { hour: number; votes: number }[]> = { all: [], designers: [], others: [] };
     for (const h of hours) {
@@ -451,7 +463,7 @@ class Tally {
     id: Id<'snapshots'> | undefined
   ) {
     const { db } = this.ctx;
-    const competitionId = this.competitionId;
+    const collectionId = this.collectionId;
     const standings = this.standings.values();
     const active = new Set(standings.filter((s) => s.active).map((s) => s.posterId));
     const counts = this.counts[segment];
@@ -463,7 +475,7 @@ class Tally {
         ? bradleyTerry(
             await db
               .query('matchups')
-              .withIndex('by_close', (q) => q.eq('competitionId', competitionId).eq('segment', segment))
+              .withIndex('by_close', (q) => q.eq('collectionId', collectionId).eq('segment', segment))
               .collect()
           )
         : null;
@@ -481,7 +493,7 @@ class Tally {
     const duel = async (index: 'by_close' | 'by_lopsided', order: 'asc' | 'desc') => {
       const candidates = await db
         .query('matchups')
-        .withIndex(index, (q) => q.eq('competitionId', competitionId).eq('segment', segment).eq('contested', true))
+        .withIndex(index, (q) => q.eq('collectionId', collectionId).eq('segment', segment).eq('contested', true))
         .order(order)
         .take(3);
       const m = candidates.find((c) => active.has(c.aId) && active.has(c.bId));
@@ -491,27 +503,28 @@ class Tally {
     const countries = (
       await db
         .query('countries')
-        .withIndex('by_code', (q) => q.eq('competitionId', competitionId).eq('segment', segment))
+        .withIndex('by_code', (q) => q.eq('collectionId', collectionId).eq('segment', segment))
         .collect()
     )
       .map(({ code, votes }) => ({ code, votes }))
       .sort((a, b) => b.votes - a.votes);
 
     // Each busy city's favourite, as the tally keeps it. Worked out here only if it isn't known
-    // yet, or has since been removed from the competition.
+    // yet, or has since been removed from the collection.
     const busiest = await db
       .query('cities')
-      .withIndex('by_votes', (q) => q.eq('competitionId', competitionId).eq('segment', segment).gte('votes', LOCAL_MIN_VOTES))
+      .withIndex('by_votes', (q) => q.eq('collectionId', collectionId).eq('segment', segment).gte('votes', LOCAL_MIN_VOTES))
       .order('desc')
       .take(LOCAL_PICKS);
     const localPicks = [];
     for (const c of busiest) {
       let best = c.best;
+      const place = { ...c, collectionId };
       if (best === undefined) {
-        best = await favourite(this.ctx, c);
+        best = await favourite(this.ctx, place);
         await db.patch(c._id, { best });
       }
-      if (best && !active.has(best.posterId)) best = await favourite(this.ctx, c, active);
+      if (best && !active.has(best.posterId)) best = await favourite(this.ctx, place, active);
       if (best) {
         localPicks.push({
           country: c.country,
@@ -525,7 +538,7 @@ class Tally {
     }
 
     const snapshot = {
-      competitionId,
+      collectionId,
       segment,
       builtAt: now,
       votes: counts.votes,
@@ -543,7 +556,7 @@ class Tally {
     }
     const existing = await db
       .query('snapshots')
-      .withIndex('by_segment', (q) => q.eq('competitionId', competitionId).eq('segment', segment))
+      .withIndex('by_segment', (q) => q.eq('collectionId', collectionId).eq('segment', segment))
       .unique();
     if (!existing) return await db.insert('snapshots', snapshot);
     await db.replace(existing._id, snapshot);
@@ -551,17 +564,17 @@ class Tally {
   }
 }
 
-/** Delete up to CLEAR_BATCH of a competition's tallies; true once none are left. */
-async function clearBatch(ctx: MutationCtx, competitionId: Id<'competitions'>) {
+/** Delete up to CLEAR_BATCH of a collection's tallies; true once none are left. */
+async function clearBatch(ctx: MutationCtx, collectionId: Id<'collections'>) {
   const { db } = ctx;
   let budget = CLEAR_BATCH;
   const batches = [
-    () => db.query('matchups').withIndex('by_close', (q) => q.eq('competitionId', competitionId)).take(budget),
-    () => db.query('voters').withIndex('by_competition_voter', (q) => q.eq('competitionId', competitionId)).take(budget),
-    () => db.query('countries').withIndex('by_code', (q) => q.eq('competitionId', competitionId)).take(budget),
-    () => db.query('cities').withIndex('by_city', (q) => q.eq('competitionId', competitionId)).take(budget),
-    () => db.query('cityPosters').withIndex('by_city_poster', (q) => q.eq('competitionId', competitionId)).take(budget),
-    () => db.query('hours').withIndex('by_hour', (q) => q.eq('competitionId', competitionId)).take(budget)
+    () => db.query('matchups').withIndex('by_close', (q) => q.eq('collectionId', collectionId)).take(budget),
+    () => db.query('voters').withIndex('by_collection_voter', (q) => q.eq('collectionId', collectionId)).take(budget),
+    () => db.query('countries').withIndex('by_code', (q) => q.eq('collectionId', collectionId)).take(budget),
+    () => db.query('cities').withIndex('by_city', (q) => q.eq('collectionId', collectionId)).take(budget),
+    () => db.query('cityPosters').withIndex('by_city_poster', (q) => q.eq('collectionId', collectionId)).take(budget),
+    () => db.query('hours').withIndex('by_hour', (q) => q.eq('collectionId', collectionId)).take(budget)
   ];
   for (const next of batches) {
     const docs = await next();
@@ -572,7 +585,7 @@ async function clearBatch(ctx: MutationCtx, competitionId: Id<'competitions'>) {
   // Standings are reset rather than deleted, so they keep whether their poster is active.
   for (const s of await db
     .query('standings')
-    .withIndex('by_competition', (q) => q.eq('competitionId', competitionId))
+    .withIndex('by_collection', (q) => q.eq('collectionId', collectionId))
     .collect()) {
     await db.patch(s._id, { all: freshScore(), designers: freshScore(), others: freshScore() });
   }
@@ -581,28 +594,28 @@ async function clearBatch(ctx: MutationCtx, competitionId: Id<'competitions'>) {
 
 /** Fold the votes since the last run into the tallies and rebuild the snapshots they changed. */
 export const run = internalMutation({
-  args: { competitionId: v.id('competitions') },
-  handler: async (ctx, { competitionId }) => {
-    const progress = await getProgress(ctx, competitionId);
+  args: { collectionId: v.id('collections') },
+  handler: async (ctx, { collectionId }) => {
+    const progress = await getProgress(ctx, collectionId);
     if (!progress) return;
     const now = Date.now();
 
     if (progress.clearing) {
-      const done = await clearBatch(ctx, competitionId);
+      const done = await clearBatch(ctx, collectionId);
       await ctx.db.patch(progress._id, { clearing: !done, pending: true, scheduledFor: now, lastRunAt: now });
-      await ctx.scheduler.runAfter(0, internal.tally.run, { competitionId });
+      await ctx.scheduler.runAfter(0, internal.tally.run, { collectionId });
       return;
     }
 
     const bound = now - SETTLE_MS;
     const votes = await ctx.db
       .query('votes')
-      .withIndex('by_competition', (q) =>
-        q.eq('competitionId', competitionId).gt('_creationTime', progress.cursor).lt('_creationTime', bound)
+      .withIndex('by_collection', (q) =>
+        q.eq('collectionId', collectionId).gt('_creationTime', progress.cursor).lt('_creationTime', bound)
       )
       .take(BATCH);
 
-    const tally = new Tally(ctx, competitionId, progress.counts);
+    const tally = new Tally(ctx, collectionId, progress.counts);
     await tally.load();
     for (const vote of votes) await tally.add(vote);
     await tally.save();
@@ -613,7 +626,7 @@ export const run = internalMutation({
       // A backlog: carry on straight away. Snapshots wait until it's done, so the page never
       // shows a half-counted tally.
       await ctx.db.patch(progress._id, { cursor, counts: tally.counts, lastRunAt: now, scheduledFor: now, stale: true });
-      await ctx.scheduler.runAfter(0, internal.tally.run, { competitionId });
+      await ctx.scheduler.runAfter(0, internal.tally.run, { collectionId });
       return;
     }
 
@@ -627,7 +640,7 @@ export const run = internalMutation({
     await ctx.db.patch(progress._id, { cursor, counts: tally.counts, lastRunAt: now, stale: false, snapshots });
     // What comes next depends on votes cast during this run, which this run deliberately doesn't
     // read (they'd make it retry); a short follow-up does.
-    await ctx.scheduler.runAfter(0, internal.tally.finish, { competitionId });
+    await ctx.scheduler.runAfter(0, internal.tally.finish, { collectionId });
   }
 });
 
@@ -636,13 +649,13 @@ export const run = internalMutation({
  * mark none pending, so the next cast schedules one).
  */
 export const finish = internalMutation({
-  args: { competitionId: v.id('competitions') },
-  handler: async (ctx, { competitionId }) => {
-    const progress = await getProgress(ctx, competitionId);
+  args: { collectionId: v.id('collections') },
+  handler: async (ctx, { collectionId }) => {
+    const progress = await getProgress(ctx, collectionId);
     if (!progress || progress.clearing) return;
     const waiting = await ctx.db
       .query('votes')
-      .withIndex('by_competition', (q) => q.eq('competitionId', competitionId).gt('_creationTime', progress.cursor))
+      .withIndex('by_collection', (q) => q.eq('collectionId', collectionId).gt('_creationTime', progress.cursor))
       .collect();
 
     // The live counts are exactly the tally plus the votes it hasn't reached.
@@ -651,9 +664,9 @@ export const finish = internalMutation({
     for (const vote of waiting) for (const segment of segmentsOf(vote)) live[segment]++;
     const liveDoc = await ctx.db
       .query('live')
-      .withIndex('by_competition', (q) => q.eq('competitionId', competitionId))
+      .withIndex('by_collection', (q) => q.eq('collectionId', collectionId))
       .unique();
-    if (!liveDoc) await ctx.db.insert('live', { competitionId, ...live });
+    if (!liveDoc) await ctx.db.insert('live', { collectionId, ...live });
     else if (liveDoc.all !== live.all || liveDoc.designers !== live.designers || liveDoc.others !== live.others) {
       await ctx.db.patch(liveDoc._id, live);
     }
@@ -661,7 +674,7 @@ export const finish = internalMutation({
     if (waiting.length) {
       const at = Math.max(Date.now() + FIRST_DELAY_MS, progress.lastRunAt + REFRESH_MS);
       await ctx.db.patch(progress._id, { pending: true, scheduledFor: at });
-      await ctx.scheduler.runAt(at, internal.tally.run, { competitionId });
+      await ctx.scheduler.runAt(at, internal.tally.run, { collectionId });
     } else {
       await ctx.db.patch(progress._id, { pending: false });
     }
@@ -669,24 +682,24 @@ export const finish = internalMutation({
 });
 
 /**
- * Hourly safety net (see crons.ts): starts the tally for the active competition if it has none yet,
+ * Hourly safety net (see crons.ts): starts the tally for the active collection if it has none yet,
  * and schedules a run if votes are waiting with none coming (e.g. a run failed).
  */
 export const ensure = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const competition = await getActive(ctx);
-    if (!competition) return;
-    const progress = await getProgress(ctx, competition._id);
-    if (!progress) return await requestRun(ctx, competition._id, { progress, now: true });
+    const collection = await getActive(ctx);
+    if (!collection) return;
+    const progress = await getProgress(ctx, collection._id);
+    if (!progress) return await requestRun(ctx, collection._id, { progress, now: true });
     const stuck = progress.pending && progress.scheduledFor < Date.now() - STUCK_MS;
     const waiting =
       !progress.pending &&
       (progress.stale ||
         (await ctx.db
           .query('votes')
-          .withIndex('by_competition', (q) => q.eq('competitionId', competition._id).gt('_creationTime', progress.cursor))
+          .withIndex('by_collection', (q) => q.eq('collectionId', collection._id).gt('_creationTime', progress.cursor))
           .first()) !== null);
-    if (stuck || waiting) await requestRun(ctx, competition._id, { progress, now: true });
+    if (stuck || waiting) await requestRun(ctx, collection._id, { progress, now: true });
   }
 });

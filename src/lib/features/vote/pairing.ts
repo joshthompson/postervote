@@ -7,7 +7,7 @@
 // The rounds, and the pairs within each, are shuffled too. With an odd number, one poster sits
 // out each round, and its pair comes first in the next so it isn't left waiting.
 //
-// Posters taken out of the competition still count towards the order, but their pairs are left
+// Posters taken out of the collection still count towards the order, but their pairs are left
 // as gaps, so taking one out doesn't reshuffle anyone's order. Adding a poster does.
 
 type Item = { _id: string };

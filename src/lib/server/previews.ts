@@ -3,48 +3,52 @@ import path from 'node:path';
 import { ConvexHttpClient } from 'convex/browser';
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
 import { api } from '$convex/api';
+import type { Archive } from '$shared';
 import { posterNames } from '$lib/features/results/links';
 
 // Link previews for posters' own pages. Crawlers don't run the app, so the build prerenders a page
-// for every poster in Convex and `hooks.server.ts` puts the poster's title and image into the
-// preview tags from app.html. Posters synced after the build still open (through the 404.html
-// fallback) but share with the site's own preview until the next deploy.
+// for every poster, in Convex or in an archived collection (archives/<slug>/results.json), and
+// `hooks.server.ts` puts the poster's title and image into the preview tags from app.html. Posters
+// synced after the build still open (through the 404.html fallback) but share with the site's own
+// preview until the next deploy.
 
-type Preview = { competition: string; name: string; title: string; competitionTitle: string; image: string };
+type Preview = { collection: string; name: string; title: string; collectionTitle: string; image: string };
 
 let previews: Promise<Map<string, Preview>> | undefined;
 
-/** Every poster's preview, by "<competition slug>/<name>", fetched once per build. */
+/** Every poster's preview, by "<collection slug>/<name>", fetched once per build. */
 const load = () => (previews ??= fetchPreviews());
+
+// Only the build reads these, so they stay out of the site's bundle.
+const archives = Object.values(import.meta.glob<Archive>('/archives/*/results.json', { eager: true, import: 'default' }));
 
 async function fetchPreviews() {
   const map = new Map<string, Preview>();
+  const add = (c: { slug: string; title: string; posters: Archive['posters'] }) => {
+    for (const [id, name] of posterNames(c.posters)) {
+      const p = c.posters.find((p) => p._id === id)!;
+      map.set(`${c.slug}/${name}`, { collection: c.slug, name, title: p.title, collectionTitle: c.title, image: p.image });
+    }
+  };
+  for (const a of archives) add({ ...a.collection, posters: a.posters });
   if (!PUBLIC_CONVEX_URL) return map;
+  const archived = new Set(archives.map((a) => a.collection.slug));
   try {
     for (const c of await new ConvexHttpClient(PUBLIC_CONVEX_URL).query(api.posters.all, {})) {
-      for (const [id, name] of posterNames(c.posters)) {
-        const p = c.posters.find((p) => p._id === id)!;
-        map.set(`${c.slug}/${name}`, {
-          competition: c.slug,
-          name,
-          title: p.title,
-          competitionTitle: c.title,
-          image: p.image
-        });
-      }
+      if (!archived.has(c.slug)) add(c);
     }
   } catch (e) {
-    console.warn(`Poster pages are built without their own link previews: ${e instanceof Error ? e.message : e}`);
+    console.warn(`Poster pages in Convex are built without their own link previews: ${e instanceof Error ? e.message : e}`);
   }
   return map;
 }
 
 /** The poster pages to prerender. */
 export const posterEntries = async () =>
-  [...(await load()).values()].map(({ competition, name }) => ({ competition, name }));
+  [...(await load()).values()].map(({ collection, name }) => ({ collection, name }));
 
 /** The preview for a poster's page, if the poster was in Convex when the build started. */
-export const posterPreview = async (competition = '', name = '') => (await load()).get(`${competition}/${name}`);
+export const posterPreview = async (collection = '', name = '') => (await load()).get(`${collection}/${name}`);
 
 /** A prerendered page with app.html's preview tags (whose og:url is the site's address) set for this poster. */
 export async function withPreview(html: string, pathname: string, p: Preview) {
@@ -54,7 +58,7 @@ export async function withPreview(html: string, pathname: string, p: Preview) {
   const size = await jpegSize(p.image);
   html = html.replace(
     /<title>([^<]*)<\/title>/,
-    (_, brand) => `<title>${escape(`${p.title} · ${p.competitionTitle} · `)}${brand}</title>`
+    (_, brand) => `<title>${escape(`${p.title} · ${p.collectionTitle} · `)}${brand}</title>`
   );
   return setMeta(html, {
     'og:title': p.title,

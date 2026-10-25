@@ -1,17 +1,15 @@
 <script lang="ts">
-  import { useQuery } from 'convex-svelte';
   import { page } from '$app/state';
   import { resolve } from '$app/paths';
-  import { api } from '$convex/api';
   import IconButton from '$lib/components/ui/IconButton.svelte';
   import { i18n } from '$lib/i18n/index.svelte';
   import { track, type NavDestination } from '$lib/services/analytics';
 
-  // Burger button with a dropdown of every page and past competitions' results.
+  // Burger button with a dropdown of every page.
   // Closes on navigation, Escape, or a click anywhere outside it.
 
   /** A menu link, and where it goes as the analytics events name it. */
-  type Link = { href: string; label: string; destination: NavDestination; competition?: string };
+  type Link = { href: string; label: string; destination: NavDestination };
 
   let open = $state(false);
   let root: HTMLElement;
@@ -19,19 +17,10 @@
   const links: Link[] = $derived([
     { href: resolve('/'), label: i18n.t.menu.vote, destination: 'vote' },
     { href: resolve('/results'), label: i18n.t.menu.rankings, destination: 'rankings' },
+    { href: resolve('/collections'), label: i18n.t.menu.collections, destination: 'collections' },
     { href: resolve('/about'), label: i18n.t.menu.about, destination: 'about' },
     { href: resolve('/settings'), label: i18n.t.menu.settings, destination: 'settings' }
   ]);
-
-  const archived = useQuery(api.competitions.archived, {});
-  const past: Link[] = $derived(
-    (archived.data ?? []).map((c) => ({
-      href: resolve('/results/[[competition]]', { competition: c.slug }),
-      label: c.title,
-      destination: 'past_results',
-      competition: c.slug
-    }))
-  );
 
   $effect(() => {
     void page.url.pathname;
@@ -50,9 +39,7 @@
     <a
       href={l.href}
       aria-current={page.url.pathname === l.href ? 'page' : undefined}
-      onclick={() =>
-        track('nav_link_clicked', { destination: l.destination, placement: 'menu', competition: l.competition })}
-      >{l.label}</a
+      onclick={() => track('nav_link_clicked', { destination: l.destination, placement: 'menu' })}>{l.label}</a
     >
   </li>
 {/snippet}
@@ -64,10 +51,6 @@
   {#if open}
     <ul id="site-menu" class="panel">
       {#each links as l}{@render item(l)}{/each}
-      {#if past.length}
-        <li class="heading" role="presentation">{i18n.t.menu.past}</li>
-        {#each past as l}{@render item(l)}{/each}
-      {/if}
     </ul>
   {/if}
 </div>
@@ -139,17 +122,5 @@
   a:hover,
   a[aria-current='page'] {
     background: var(--red);
-  }
-  .heading {
-    margin: 8px 0 0;
-    padding: 0.8em 1em 0.3em;
-    border-top: 1px solid rgba(255, 247, 238, 0.2);
-    color: var(--paper);
-    opacity: 0.6;
-    font-weight: 700;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    white-space: nowrap;
   }
 </style>
