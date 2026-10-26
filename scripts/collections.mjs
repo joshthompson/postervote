@@ -1,18 +1,23 @@
 #!/usr/bin/env node
-// Publish, archive and clear collections (see "Collections" in the README).
+// Draft, publish, archive and clear collections (see "Collections" in the README).
 //
 //   pnpm collections                      → list the collections in Convex and in archives/
-//   pnpm collections publish              → posters/collection.json becomes the live collection,
-//                                           closing voting on the one before (posters:sync --publish)
+//   pnpm collections draft                → posters/collection.json becomes a draft (or updates it),
+//                                           seen only in the site's dev mode (posters:sync --draft)
+//   pnpm collections publish [slug]       → the draft (by default the one in posters/collection.json)
+//                                           becomes the live collection, and the one before closes
+//                                           and is archived, as `archive` does
 //   pnpm collections archive <slug>       → write a closed collection to archives/<slug>/ in the repo:
 //                                           results.json and summary.json, which the site shows it
 //                                           from, and votes.json.gz, every vote (voters numbered)
 //   pnpm collections clear <slug>         → once that's deployed, delete it all from Convex
+//   pnpm collections discard <slug>       → delete a draft
+//   --dir <folder>                        → draft from another folder than posters/ (and publish its slug)
 //   --prod                                → the production deployment (CONVEX_DEPLOY_KEY from .env.production)
 //   --close                               → archive the live collection, ending voting with none live
-//   --yes                                 → clear without asking
-//   --force                               → archive over an archive from the other deployment, or clear
-//                                           without checking the live site
+//   --yes                                 → publish, clear or discard without asking
+//   --force                               → archive over an archive from the other deployment, or publish
+//                                           and clear without checking the live site
 
 import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -29,6 +34,7 @@ const ARCHIVES = path.join(root, 'archives');
 const { values: opts, positionals } = parseArgs({
   allowPositionals: true,
   options: {
+    dir: { type: 'string', default: 'posters' },
     prod: { type: 'boolean', default: false },
     close: { type: 'boolean', default: false },
     yes: { type: 'boolean', default: false },
@@ -67,7 +73,12 @@ async function convex(fn, args = {}) {
     // A function that returns nothing prints nothing.
     return stdout.trim() ? JSON.parse(stdout) : undefined;
   } catch (e) {
-    fail((e.stderr || e.message).trim());
+    const message = (e.stderr || e.message).trim();
+    // Reading a collection out for its archive takes internal queries, which a restricted key can't run.
+    const hint = /do not have permission/.test(message)
+      ? '\nThe deploy key in .env.production needs permission to run internal functions (Convex dashboard → Settings → Deploy keys).'
+      : '';
+    fail(message + hint);
   }
 }
 
@@ -88,13 +99,20 @@ async function site() {
 }
 
 async function list() {
-  const live = await convex('collections:list');
+  const live = await inConvex();
   const archived = (await fs.readdir(ARCHIVES).catch(() => [])).filter((s) => !s.startsWith('.'));
   console.log(`In Convex (${deployment}):`);
   if (!live.length) console.log('  none');
   for (const c of live) {
-    const state = c.active ? 'live' : archived.includes(c.slug) ? 'archived, not cleared yet' : 'closed, not archived';
-    console.log(`  ${c.slug}  “${c.title}”  ${num(c.votes)} votes  ${day(c.openedAt)} – ${c.active ? 'now' : day(c.closedAt)}  (${state})`);
+    const state = c.draft
+      ? 'draft'
+      : c.active
+        ? 'live'
+        : archived.includes(c.slug)
+          ? 'archived, not cleared yet'
+          : 'closed, not archived';
+    const dates = c.draft ? '' : `  ${day(c.openedAt)} – ${c.active ? 'now' : day(c.closedAt)}`;
+    console.log(`  ${c.slug}  “${c.title}”  ${num(c.votes)} votes${dates}  (${state})`);
   }
   console.log('In archives/:');
   if (!archived.length) console.log('  none');
@@ -104,14 +122,72 @@ async function list() {
   }
 }
 
-function publish() {
-  const argv = [path.join(root, 'scripts/sync-posters.mjs'), '--publish'];
+/** Ask before something that can't be undone: they type `answer` to go ahead (or pass --yes). */
+async function confirm(question, answer) {
+  if (opts.yes) return;
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const typed = await rl.question(`${question} Type ${answer} to confirm: `);
+  rl.close();
+  if (typed.trim() !== answer) fail('Nothing changed.');
+}
+
+/** Every collection in Convex, drafts too. A public query, so any deploy key can read it. */
+const inConvex = () => convex('collections:list', { drafts: true });
+
+function draft() {
+  const argv = [path.join(root, 'scripts/sync-posters.mjs'), '--draft', '--dir', path.resolve(opts.dir)];
   if (opts.prod) argv.push('--prod');
   const child = spawn(process.execPath, argv, { cwd: root, env, stdio: 'inherit' });
-  child.on('exit', (code) => {
+  child.on('exit', async (code) => {
     if (code) process.exit(code);
-    console.log('Archive the collection it closed with: pnpm collections archive <slug>' + (opts.prod ? ' --prod' : ''));
+    const { slug: s } = JSON.parse(await fs.readFile(path.resolve(opts.dir, 'collection.json'), 'utf8'));
+    console.log(`Look it over at /collections/${s} with setDevMode(true) in the browser console.`);
+    console.log(`Commit static/posters/${s} and deploy, so its images are on the site, then: pnpm collections publish ${s}${opts.prod ? ' --prod' : ''}`);
   });
+}
+
+async function publish() {
+  const target = slug ?? JSON.parse(await fs.readFile(path.resolve(opts.dir, 'collection.json'), 'utf8')).slug;
+  const collections = await inConvex();
+  const next = collections.find((c) => c.slug === target);
+  if (!next) fail(`No collection “${target}” in Convex (${deployment}). Draft it first: pnpm collections draft`);
+  if (!next.draft) fail(`“${next.title}” isn't a draft${next.active ? ': it’s already live' : ''}.`);
+  const live = collections.find((c) => c.active);
+
+  if (live) {
+    // Everything archiving needs, checked before anything changes.
+    const previous = await readSummary(live.slug);
+    if (previous && previous.deployment !== deployment && !opts.force) {
+      fail(`archives/${live.slug} came from ${previous.deployment}, not ${deployment}. Pass --force to replace it.`);
+    }
+    await convex('archive:state', { slug: live.slug });
+  }
+
+  // Voters would see broken images if the draft's weren't deployed yet.
+  if (opts.prod && !opts.force) {
+    const base = await site();
+    const { posters } = await convex('posters:list', { collection: target });
+    const missing = [];
+    for (const p of posters) {
+      const res = await fetch(new URL(p.image, base + '/'), { method: 'HEAD' }).catch(() => null);
+      if (res?.status !== 200) missing.push(p.image);
+    }
+    if (missing.length) {
+      fail(`${num(missing.length)} of its images aren’t on ${base} yet (e.g. ${missing[0]}). Commit static/posters/${target} and deploy first.`);
+    }
+  }
+
+  await confirm(
+    live
+      ? `Publish “${next.title}” and close voting on “${live.title}” (${deployment})? It’s then archived to archives/${live.slug}.`
+      : `Publish “${next.title}” (${deployment})?`,
+    target
+  );
+  const { published, closed } = await convex('collections:publish', { slug: target });
+  console.log(`“${published}” is live.`);
+  if (!closed) return;
+  console.log(`Voting on “${closed.title}” is closed. Archiving it…`);
+  await archiveCollection(closed.slug);
 }
 
 async function archive() {
@@ -121,14 +197,20 @@ async function archive() {
     fail(`archives/${slug} came from ${previous.deployment}, not ${deployment}. Pass --force to replace it.`);
   }
 
-  let state = await convex('archive:state', { slug });
+  const state = await convex('archive:state', { slug });
   if (!state) fail(`No collection “${slug}” in Convex (${deployment}).`);
+  if (state.draft) fail(`“${state.title}” is a draft. Publish it (pnpm collections publish ${slug}) or discard it.`);
   if (state.active && !opts.close) {
     fail(`“${state.title}” is live. Publish the next collection first (pnpm collections publish), or pass --close to end voting with none live.`);
   }
+  await archiveCollection(slug);
+}
 
+/** Close a collection (if it's still live), wait for its last votes to be counted, and write its archive. */
+async function archiveCollection(slug) {
+  let state;
   const { wasActive } = await convex('archive:close', { slug });
-  if (wasActive) console.log(`Voting on “${state.title}” is closed.`);
+  if (wasActive) console.log('Voting on it is closed.');
   process.stdout.write('Waiting for the tally to count the last votes…');
   for (let waited = 0; !(state = await convex('archive:state', { slug })).tallied; waited += 5) {
     if (waited >= 300) fail('\nThe tally hasn’t caught up in 5 minutes. Check it on /admin/stats, then run this again.');
@@ -192,6 +274,17 @@ async function archive() {
   console.log(`  pnpm collections clear ${slug}${opts.prod ? ' --prod' : ''}`);
 }
 
+async function discard() {
+  if (!slug) fail('Which draft? pnpm collections discard <slug>');
+  const d = (await inConvex()).find((c) => c.slug === slug);
+  if (!d) return console.log(`“${slug}” isn’t in Convex (${deployment}); nothing to discard.`);
+  if (!d.draft) fail(`“${d.title}” isn’t a draft.`);
+  await confirm(`Delete the draft “${d.title}” and its posters from Convex (${deployment})?`, slug);
+  await convex('archive:clear', { slug });
+  while ((await inConvex()).some((c) => c.slug === slug)) await wait(1000);
+  console.log(`Discarded “${d.title}”. Its images are still in static/posters/${slug}.`);
+}
+
 async function clear() {
   if (!slug) fail('Which collection? pnpm collections clear <slug>');
   const summary = await readSummary(slug);
@@ -213,14 +306,7 @@ async function clear() {
     if (res?.status !== 200) fail(`${url} isn’t live yet (${res?.status ?? 'unreachable'}). Commit archives/${slug} and deploy first.`);
   }
 
-  if (!opts.yes) {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    const answer = await rl.question(
-      `Delete “${state.title}” from Convex (${deployment}): its ${num(summary.votes)} votes, posters and rankings? Type the slug to confirm: `
-    );
-    rl.close();
-    if (answer.trim() !== slug) fail('Nothing deleted.');
-  }
+  await confirm(`Delete “${state.title}” from Convex (${deployment}): its ${num(summary.votes)} votes, posters and rankings?`, slug);
 
   await convex('archive:clear', { slug });
   process.stdout.write('Deleting…');
@@ -231,6 +317,6 @@ async function clear() {
   console.log(` done. “${state.title}” now shows from archives/${slug}.`);
 }
 
-const commands = { list, publish, archive, clear };
-if (!commands[command]) fail(`Unknown command “${command}”. Try list, publish, archive or clear.`);
+const commands = { list, draft, publish, archive, clear, discard };
+if (!commands[command]) fail(`Unknown command “${command}”. Try list, draft, publish, archive, clear or discard.`);
 await commands[command]();

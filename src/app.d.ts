@@ -8,6 +8,11 @@ declare global {
       poster?: Id<'posters'>;
     }
   }
+
+  interface Window {
+    /** Turns dev mode on (or off with false), from the console. See devMode.svelte.ts. */
+    setDevMode(on?: boolean): string;
+  }
 }
 
 export {};

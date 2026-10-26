@@ -65,7 +65,7 @@ export const overview = query({
 
     const { slug, title, active } = collection;
     return {
-      collection: { slug, title, active },
+      collection: { slug, title, active, draft: !!collection.draft },
       hours: hours.map(({ hour, all, designers, others }) => ({ hour, all, designers, others })),
       counts: progress?.counts ?? null,
       tally: progress

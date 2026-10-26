@@ -61,7 +61,8 @@ export function archiveOf(slug: string): Archive | Error | undefined {
 export const collectionOf = (archive: Archive) => ({
   slug: archive.collection.slug,
   title: archive.collection.title,
-  active: false
+  active: false,
+  draft: false
 });
 
 /**

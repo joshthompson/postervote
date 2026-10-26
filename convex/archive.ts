@@ -56,6 +56,7 @@ export const close = internalMutation({
   args: slugArgs,
   handler: async (ctx, { slug }) => {
     const collection = await mustFind(ctx, slug);
+    if (collection.draft) throw new ConvexError(`"${slug}" is a draft. Discard it with pnpm collections discard ${slug}.`);
     if (collection.active) await ctx.db.patch(collection._id, { active: false, closedAt: Date.now() });
     await settle(ctx, collection._id);
     return { title: collection.title, wasActive: collection.active };
@@ -84,6 +85,7 @@ export const state = internalQuery({
     return {
       title: collection.title,
       active: collection.active,
+      draft: !!collection.draft,
       archivedAt: collection.archivedAt ?? null,
       // Everything the archive is read from is up to date.
       tallied: !untallied && (!progress || (!progress.pending && !progress.clearing && !progress.stale))
@@ -226,15 +228,15 @@ export const markArchived = internalMutation({
 });
 
 /**
- * Delete an archived collection and everything in it: its votes, posters and tallies, then the
- * collection itself. Runs itself a batch at a time until it's gone (`state` is then null). The
+ * Delete an archived collection (or a draft, to discard it) and everything in it: its votes,
+ * posters and tallies, then the collection itself. Runs itself a batch at a time until it's gone (`state` is then null). The
  * tally's own rows go first, so no tally run can rebuild anything behind it.
  */
 export const clear = internalMutation({
   args: slugArgs,
   handler: async (ctx, { slug }) => {
     const collection = await mustFind(ctx, slug);
-    if (collection.active || !collection.archivedAt) {
+    if (collection.active || !(collection.archivedAt || collection.draft)) {
       throw new ConvexError(`"${slug}" hasn't been archived. Run pnpm collections archive ${slug} first.`);
     }
     const collectionId = collection._id;

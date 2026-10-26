@@ -4,9 +4,11 @@
 //
 //   pnpm posters:sync        → dev deployment: updates the live collection's posters
 //   pnpm posters:sync:prod   → production deployment (uses CONVEX_DEPLOY_KEY from .env.production)
-//   --publish                → a new slug becomes the live collection, closing voting on the one
-//                              before (its images stay in place). `pnpm collections publish` adds it.
+//   --draft                  → a new slug becomes a draft, seen only in the site's dev mode, until
+//                              `pnpm collections publish` makes it live. `pnpm collections draft` adds it.
 //   --images-only            → just optimise images (run before every build)
+//   --dir <folder>           → read the images, collection.json and titles.json from another folder
+//                              than ./posters, e.g. one prepared for the next collection
 //
 // Titles come from posters/titles.json ({ "001.jpg": "My Title" }), falling back to the filename.
 // HEIC and resizing use macOS `sips`; on other platforms JPEG/PNG/WebP are copied as-is.
@@ -19,7 +21,8 @@ import os from 'node:os';
 
 const run = promisify(execFile);
 const root = path.resolve(import.meta.dirname, '..');
-const SRC = path.join(root, 'posters');
+const dirAt = process.argv.indexOf('--dir');
+const SRC = dirAt > 0 ? path.resolve(process.argv[dirAt + 1]) : path.join(root, 'posters');
 const collection = JSON.parse(await fs.readFile(path.join(SRC, 'collection.json'), 'utf8'));
 if (!/^[a-z0-9-]+$/.test(collection.slug ?? '') || !collection.title) {
   console.error('posters/collection.json needs a "slug" (a-z, 0-9, -) and a "title"');
@@ -31,7 +34,7 @@ const IMAGE = /\.(heic|heif|jpe?g|png|webp|avif)$/i;
 const WEB_SAFE = /\.(jpe?g|png|webp|avif)$/i;
 const prod = process.argv.includes('--prod');
 const imagesOnly = process.argv.includes('--images-only');
-const publish = process.argv.includes('--publish');
+const draft = process.argv.includes('--draft');
 const hasSips = os.platform() === 'darwin';
 
 async function readTitles() {
@@ -134,19 +137,19 @@ const posters = converted.map(({ file, outName }) => ({
   image: `posters/${collection.slug}/${outName}`
 }));
 
-console.log(`${publish ? 'Publishing' : 'Syncing'} “${collection.title}” to Convex (${prod ? 'prod' : 'dev'})…`);
+console.log(`Syncing “${collection.title}” to Convex (${prod ? 'prod' : 'dev'})…`);
 const args = [
   'convex',
   'run',
   'posters:sync',
-  JSON.stringify({ collection: { slug: collection.slug, title: collection.title }, posters, publish })
+  JSON.stringify({ collection: { slug: collection.slug, title: collection.title }, posters, draft })
 ];
 if (prod) args.push('--prod');
 let stdout;
 try {
   ({ stdout } = await run('npx', args, { cwd: root, maxBuffer: 10 * 1024 * 1024 }));
 } catch (e) {
-  // Convex's own message (e.g. that publishing needs --publish) is the useful part.
+  // Convex's own message (e.g. that a new slug needs --draft) is the useful part.
   console.error((e.stderr || e.message).trim());
   process.exit(1);
 }

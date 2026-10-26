@@ -3,6 +3,7 @@ import type { FunctionReturnType } from 'convex/server';
 import { api } from '$convex/api';
 import type { Id } from '$convex/dataModel';
 import type { Segment } from '$shared';
+import { devMode } from '$lib/state/devMode.svelte';
 import { archiveOf, collectionOf, isArchived, posterDetail, summaries, type Archive } from './archives.svelte';
 
 // What the rankings, poster pages and admin pages read about a collection, from wherever it is:
@@ -88,26 +89,29 @@ export type CollectionEntry = {
   slug: string;
   title: string;
   active: boolean;
+  /** Not published yet: listed in dev mode only. */
+  draft: boolean;
   openedAt: number;
   closedAt: number | null;
   votes: number;
   posters: number;
-  /** Its top three so far, best first. */
+  /** Its top three so far, best first (a draft's first three posters). */
   top: { title: string; image: string }[];
 };
 
 /**
- * Every collection: the live one first, then the closed ones, most recently closed first. A
- * collection archived but not yet cleared from Convex is shown from its archive. While Convex
- * hasn't answered (or can't), `data` has the archived ones alone.
+ * Every collection: drafts first (in dev mode only), then the live one, then the closed ones,
+ * most recently closed first. A collection archived but not yet cleared from Convex is shown from
+ * its archive. While Convex hasn't answered (or can't), `data` has the archived ones alone.
  */
 export function useCollections() {
-  const query = useQuery(api.collections.list, {});
+  const query = useQuery(api.collections.list, () => ({ drafts: devMode.on }));
   const data = $derived.by((): CollectionEntry[] => {
     const archived = new Set(summaries.map((s) => s.slug));
-    const all: CollectionEntry[] = [...(query.data ?? []).filter((c) => !archived.has(c.slug)), ...summaries.map((s) => ({ ...s, active: false }))];
+    const all: CollectionEntry[] = [...(query.data ?? []).filter((c) => !archived.has(c.slug)), ...summaries.map((s) => ({ ...s, active: false, draft: false }))];
     const ended = (c: CollectionEntry) => c.closedAt ?? c.openedAt;
-    return all.sort((a, b) => Number(b.active) - Number(a.active) || ended(b) - ended(a));
+    const rank = (c: CollectionEntry) => (c.draft ? 2 : c.active ? 1 : 0);
+    return all.sort((a, b) => rank(b) - rank(a) || ended(b) - ended(a));
   });
   return {
     get data() {

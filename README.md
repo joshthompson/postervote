@@ -43,23 +43,35 @@ Put images (JPEG, PNG, WebP, or HEIC on macOS) in `posters/`, then run `pnpm pos
 1. converts and resizes each image into `static/posters/<slug>/` using macOS `sips`
 2. upserts each poster in the live collection, keyed by filename; posters whose files have been removed are deactivated, and their votes are kept (to delete their votes too, see `posters:remove` below)
 
-`posters:sync` only updates the live collection: a slug that isn't the live one is refused, so a typo can't close voting.
+`posters:sync` updates the live collection or a draft. Any other slug is refused, so a typo can't start a new collection.
 
 Each visitor sees the pairs in their own fixed order. Taking a poster out leaves gaps in it rather than reshuffling it, so nobody is shown pairs they've already voted on. Adding a poster does reshuffle it. Until a visitor has seen every poster, a progress bar fills as they go, and pairs of posters they've already seen are skipped, so it takes about half as many pairs as there are posters.
 
-### Publishing and archiving a collection
+### Drafting, publishing and archiving a collection
 
-`pnpm collections` (`scripts/collections.mjs`) does it all. Add `--prod` for production; with no command, it lists the collections in Convex and in `archives/`.
+`pnpm collections` (`scripts/collections.mjs`) does it all. Add `--prod` for production; with no command, it lists the collections in Convex (drafts too) and in `archives/`.
 
-1. **Publish the next one.** Give `collection.json` a new slug and title, replace the images and `titles.json`, and run `pnpm collections publish`. It syncs like `posters:sync`, makes the new collection the live one, and closes voting on the one before. The old collection's images stay in `static/posters/<old slug>/`. Commit and deploy as usual.
-2. **Archive the old one.** Run `pnpm collections archive <old slug>`. It waits for the tally to count the last votes, then writes `archives/<slug>/`:
-   - `summary.json`: what `/collections` shows
-   - `results.json`: everything the collection's pages show (rankings for each voter group, head-to-heads, biggest fans and the admin stats), loaded only when the collection is opened
-   - `votes.json.gz`: every vote, as a backup. Voters are numbered in the order they first voted, not by their browser's id, because the repo is public.
+1. **Draft the next one.** Give `collection.json` a new slug and title, replace the images and `titles.json`, and run `pnpm collections draft`. The new collection is in Convex but not live: visitors don't see it, and it can't be voted on. Run it again after changing images or titles. To draft from a folder prepared elsewhere, leaving `posters/` as it is, add `--dir <folder>` (it needs its own `collection.json` and `titles.json`), and pass the slug to `publish`. To get rid of a draft, run `pnpm collections discard <slug>`.
+2. **Look it over.** Run `setDevMode(true)` in the browser console (`setDevMode(false)` turns it off). Dev mode is remembered on that device, and while it's on, drafts show on `/collections` and at `/collections/<slug>`, labelled as drafts. It only hides drafts; it doesn't protect them. Anyone who knows a draft's slug can ask Convex for its posters, though nothing in the built site gives one away.
+3. **Deploy its images.** Commit `static/posters/<slug>/` and deploy.
+4. **Publish it.** Run `pnpm collections publish`, which publishes the draft named in `collection.json`, or pass a slug. In one go, it:
+   - makes the draft the live collection
+   - closes voting on the one before
+   - waits for the tally to count that collection's last votes
+   - archives it to `archives/<old slug>/`
 
-   The site is built with these files (`src/lib/features/collections/archives.svelte.ts`) and reads an archived collection from them, never from Convex. To end voting without a new collection, archive the live one with `--close`.
-3. **Commit `archives/<slug>/` and deploy.**
-4. **Clear it from Convex.** Run `pnpm collections clear <slug>`. It deletes the collection's votes, posters and tallies from Convex, a batch at a time. It asks you to type the slug first (`--yes` skips that). With `--prod`, it first checks that `https://postervote.com/collections/<slug>` is live, which is true once a build with the archive is deployed (`--force` skips that check).
+   Before changing anything, it checks it can read what the archive needs. With `--prod`, it also checks that the draft's images are on the live site (`--force` skips that). It asks you to type the slug first (`--yes` skips that).
+5. **Commit `archives/<old slug>/` and deploy.**
+6. **Clear the old one from Convex.** Run `pnpm collections clear <old slug>`. It deletes the collection's votes, posters and tallies from Convex, a batch at a time. It asks you to type the slug first (`--yes` skips that). With `--prod`, it first checks that `https://postervote.com/collections/<slug>` is live, which is true once a build with the archive is deployed.
+
+An archive is three files:
+- `summary.json`: what `/collections` shows
+- `results.json`: everything the collection's pages show (rankings for each voter group, head-to-heads, biggest fans and the admin stats), loaded only when the collection is opened
+- `votes.json.gz`: every vote, as a backup. Voters are numbered in the order they first voted, not by their browser's id, because the repo is public.
+
+The site is built with these files (`src/lib/features/collections/archives.svelte.ts`) and reads an archived collection from them, never from Convex. To archive a collection by itself, run `pnpm collections archive <slug>`. To end voting with no new collection, archive the live one with `--close`.
+
+Archiving reads through Convex's internal functions, so with `--prod` the deploy key in `.env.production` needs permission to run them.
 
 An archived slug can't be published again. Archives from the dev deployment are marked as such, and `archive --prod` won't overwrite them without `--force`. Don't commit a dev archive.
 
@@ -121,7 +133,7 @@ After a normal deploy nothing needs running: the first vote, or the hourly check
 Competitions became collections. Convex can't rename a table or a field, so the data is moved over by a migration, in this order:
 
 1. Deploy as usual: push to `main` (or `pnpm deploy:web`). Until the next step has started, the live site finds no live collection, so start it as soon as the deploy is done.
-2. `npx convex run migrations:collections --prod`, then wait until `npx convex data competitions --prod` is empty (a minute or so).
+2. `npx dotenv -e .env.production -- npx convex run migrations:collections --prod`. That loads the production deploy key, as `posters:sync:prod` does: plain `--prod` doesn't reach production. Within seconds, `/collections` shows the live collection again. The recount carries on in the background for a minute or so; the Convex dashboard's `competitions` table is empty once it's finished.
 3. Deploy again (`gh workflow run deploy.yml`, or `pnpm deploy:web`). The first build ran before there were any collections, so its poster pages have no link previews.
 
 Voting carries on throughout, apart from the moment between steps 1 and 2. The migration runs itself step by step:

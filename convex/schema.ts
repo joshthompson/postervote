@@ -25,14 +25,17 @@ const duel = v.union(
 );
 
 export default defineSchema({
-  // One is live (being voted on). The rest have closed: once a closed one is archived to
-  // archives/<slug>/ in the repo, `archive.clear` deletes it and everything in it from here.
+  // One is live (being voted on). Drafts are being put together, seen only in the site's dev mode,
+  // until `collections.publish` makes one live. The rest have closed: once a closed one is archived
+  // to archives/<slug>/ in the repo, `archive.clear` deletes it and everything in it from here.
   collections: defineTable({
     // Stable key from posters/collection.json, also used in URLs.
     slug: v.string(),
     title: v.string(),
     active: v.boolean(),
-    // When it was published (for a migrated competition, when that was made).
+    // Not published yet (see `collections.publish`). Missing once it has been.
+    draft: v.optional(v.boolean()),
+    // When it was published (when a draft was made, until it is; for a migrated competition, when that was made).
     openedAt: v.number(),
     // When its poster list last changed, so pages can keep their copy until it does (see posters.list).
     postersUpdatedAt: v.optional(v.number()),

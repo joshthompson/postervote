@@ -10,7 +10,8 @@
   import { useCollections } from './data.svelte';
 
   // Every collection, the live one first and marked as live, then the closed ones, most recently
-  // closed first. Each shows its top three fanned out as a preview and links to its results.
+  // closed first (and in dev mode, drafts before them all). Each shows its top three fanned out as
+  // a preview and links to its results.
 
   const collections = useCollections();
   const t = $derived(i18n.t.collections);
@@ -40,7 +41,7 @@
 {:else}
   <ul class="list">
     {#each list as c, i (c.slug)}
-      <li class="entry" class:live={c.active} style="--i:{i}">
+      <li class="entry" class:live={c.active} class:draft={c.draft} style="--i:{i}">
         {#if c.top.length}
           <div class="preview" aria-hidden="true">
             {#each fan(c.top) as { poster, place } (place)}
@@ -49,7 +50,9 @@
           </div>
         {/if}
         <div class="info">
-          {#if c.active}
+          {#if c.draft}
+            <p class="badge draft-badge">{t.draft} · {t.draftNote}</p>
+          {:else if c.active}
             <p class="badge"><span class="dot" aria-hidden="true"></span>{t.live} · {t.votingNow}</p>
           {/if}
           <h2>
@@ -60,9 +63,11 @@
               >{c.title}</a
             >
           </h2>
-          <p class="period">{t.period(c.openedAt, c.active ? null : (c.closedAt ?? c.openedAt))}</p>
+          {#if !c.draft}
+            <p class="period">{t.period(c.openedAt, c.active ? null : (c.closedAt ?? c.openedAt))}</p>
+          {/if}
           <p class="numbers">{t.votes(c.votes)} · {t.posters(c.posters)}</p>
-          {#if c.top[0]}
+          {#if c.top[0] && !c.draft}
             <p class="winner"><span class="label">{c.active ? t.leading : t.winner}</span> {c.top[0].title}</p>
           {/if}
           {#if c.active}
@@ -121,6 +126,9 @@
   }
   .entry.live {
     border-color: var(--red);
+  }
+  .entry.draft {
+    border: 3px dashed var(--muted);
   }
   /* Without a preview (no votes yet), the details take the whole card. */
   .entry:not(:has(.preview)) {
@@ -244,6 +252,9 @@
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
+  }
+  .draft-badge {
+    background: var(--muted);
   }
   .dot {
     width: 8px;

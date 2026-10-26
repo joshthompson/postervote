@@ -8,6 +8,7 @@
   import { i18n } from '$lib/i18n/index.svelte';
   import { track } from '$lib/services/analytics';
   import { usePosters } from '$lib/services/posters.svelte';
+  import { devMode } from '$lib/state/devMode.svelte';
   import { visibility } from '$lib/state/visibility.svelte';
   import Note from './Note.svelte';
   import PosterPanel from './PosterPanel.svelte';
@@ -31,6 +32,8 @@
   const posters = $derived(posterList.data ?? []);
   const posterById = $derived(new Map(posters.map((p) => [p._id, p])));
   const collection = $derived(main.data?.collection);
+  // A draft's posters show only in dev mode (see devMode.svelte.ts).
+  const hidden = $derived(!!collection?.draft && !devMode.on);
   const error = $derived(main.error ?? posterList.error);
   const id = $derived([...posterNames(posters)].find(([, n]) => n === name)?.[0]);
   // Undefined while loading; null if no poster in the collection has this name.
@@ -50,13 +53,15 @@
 
 {#if error}
   <Note>{t.loadError(error.message)}</Note>
-{:else if main.data === null}
+{:else if main.data === null || hidden}
   <Note>{t.noCollectionHere} <a href={resolve('/results')}>{t.seeCurrent}</a>.</Note>
 {:else if poster === null}
   <Note>{t.detail.noPoster} <a href={rankings}>{t.detail.seeRankings}</a>.</Note>
 {:else if poster && collection}
   <p class="collection">
-    <span class="legible">{collection.title}{collection.active ? '' : ` · ${t.archived}`}</span>
+    <span class="legible"
+      >{collection.title}{collection.draft ? ` · ${t.draft}` : collection.active ? '' : ` · ${t.archived}`}</span
+    >
   </p>
   <article class="card">
     <PosterPanel {poster} segment="all" collection={slug} {posterById}>

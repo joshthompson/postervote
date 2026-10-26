@@ -21,10 +21,10 @@ export const snapshot = query({
       .query('snapshots')
       .withIndex('by_segment', (q) => q.eq('collectionId', collection._id).eq('segment', args.segment))
       .unique();
-    const { slug, title, active } = collection;
-    if (!snap) return { collection: { slug, title, active }, snapshot: null };
+    const info = { slug: collection.slug, title: collection.title, active: collection.active, draft: !!collection.draft };
+    if (!snap) return { collection: info, snapshot: null };
     const { _id, _creationTime, collectionId, competitionId, segment: _, ...rest } = snap;
-    return { collection: { slug, title, active }, snapshot: rest };
+    return { collection: info, snapshot: rest };
   }
 });
 

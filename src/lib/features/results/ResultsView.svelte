@@ -9,6 +9,7 @@
   import { i18n } from '$lib/i18n/index.svelte';
   import { track } from '$lib/services/analytics';
   import { usePosters } from '$lib/services/posters.svelte';
+  import { devMode } from '$lib/state/devMode.svelte';
   import { visibility } from '$lib/state/visibility.svelte';
   import Disagreements from './Disagreements.svelte';
   import Highlights from './Highlights.svelte';
@@ -55,8 +56,10 @@
   const posters = $derived(posterList.data ?? []);
   const posterById = $derived(new Map(posters.map((p) => [p._id, p])));
   const collection = $derived(main.data?.collection);
-  const archived = $derived(collection?.active === false);
-  const missing = $derived(main.data === null);
+  // A draft shows only in dev mode (see devMode.svelte.ts); to anyone else, it isn't there.
+  const draft = $derived(!!collection?.draft);
+  const archived = $derived(collection?.active === false && !draft);
+  const missing = $derived(main.data === null || (draft && !devMode.on));
   const error = $derived(main.error ?? posterList.error ?? counts.error);
   // While a newly picked group loads, the last group's snapshot stays on screen (keepPreviousData),
   // and its live count has to stay with it: mixing them puts "today" off by the groups' difference.
@@ -125,6 +128,7 @@
     if (missing) return slug ? t.noCollectionHere : t.noCollection;
     if (view === 'disagree') return t.disagreeSub;
     if (!data) return t.tallying;
+    if (draft) return t.draftSub;
     return archived ? t.final(data.stats.totalVotes, segment) : t.live(data.stats.totalVotes, segment);
   });
 
@@ -137,7 +141,7 @@
       { label: t.stats.voters, value: s.voters },
       { label: t.stats.posters, value: s.posterCount },
       // A closed collection has no votes today.
-      ...(archived ? [] : [{ label: t.stats.today, value: s.today }]),
+      ...(archived || draft ? [] : [{ label: t.stats.today, value: s.today }]),
       { label: t.stats.explored, value: coverage, decimals: coverage < 10 ? 1 : 0, suffix: '%' }
     ];
   });
@@ -149,7 +153,7 @@
 
 <ResultsHero
   heading={t.heading}
-  collection={collection && `${collection.title}${archived ? ` · ${t.archived}` : ''}`}
+  collection={collection && !missing ? `${collection.title}${draft ? ` · ${t.draft}` : archived ? ` · ${t.archived}` : ''}` : undefined}
   {sub}
 />
 
@@ -181,7 +185,7 @@
       <Note>
         {#if archived}
           {t.noVotesArchived(segment)}
-        {:else if view === 'all'}
+        {:else if view === 'all' && !draft}
           {t.noVotesYet[0]}<a href={resolve('/')}>{t.noVotesYet[1]}</a>{t.noVotesYet[2]}
         {:else}
           {t.noVotesSegment(segment)}

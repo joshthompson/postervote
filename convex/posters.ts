@@ -41,13 +41,14 @@ export const list = query({
 });
 
 /**
- * Every collection's current posters, in the same order as `list`. The site build reads it to
- * prerender each poster's page with its own link preview (see src/lib/server/previews.ts).
+ * Every published collection's current posters, in the same order as `list`. The site build reads
+ * it to prerender each poster's page with its own link preview (see src/lib/server/previews.ts);
+ * drafts' posters are left out, so nothing in the built site gives them away.
  */
 export const all = query({
   args: {},
   handler: async (ctx) => {
-    const collections = await ctx.db.query('collections').collect();
+    const collections = (await ctx.db.query('collections').collect()).filter((c) => !c.draft);
     return Promise.all(
       collections.map(async (c) => {
         const posters = await ctx.db
@@ -61,43 +62,43 @@ export const all = query({
 });
 
 /**
- * Upsert the active collection's posters by key, and deactivate any of its posters not in the
- * list. Only what differs is written, and the collection's poster version moves on only if the
- * list changed, so pages keep their copy. With `publish`, a new slug becomes the active collection
- * and voting closes on the one before (archive it with `pnpm collections archive`); without it,
- * a slug other than the live one is refused, so a typo can't close voting. Called by
- * `pnpm posters:sync` and `pnpm collections publish`.
+ * Upsert a collection's posters by key, and deactivate any of its posters not in the list. Only
+ * what differs is written, and the collection's poster version moves on only if the list changed,
+ * so pages keep their copy. It updates the live collection or a draft; a new slug becomes a draft
+ * with `draft` (publish it with `collections.publish`), or the live collection if none is.
+ * Closed collections can't change. Called by `pnpm posters:sync` and `pnpm collections draft`.
  */
 export const sync = internalMutation({
   args: {
     collection: v.object({ slug: v.string(), title: v.string() }),
     posters: v.array(v.object({ key: v.string(), title: v.string(), image: v.string() })),
-    publish: v.optional(v.boolean())
+    draft: v.optional(v.boolean())
   },
-  handler: async (ctx, { collection, posters, publish = false }) => {
+  handler: async (ctx, { collection, posters, draft = false }) => {
     const existingCollection = await find(ctx, collection.slug);
-    if (existingCollection?.archivedAt) {
-      throw new ConvexError(`"${collection.slug}" has been archived. Give the new collection its own slug.`);
+    if (existingCollection && !existingCollection.active && !existingCollection.draft) {
+      throw new ConvexError(`"${collection.slug}" has closed. Give the next collection its own slug.`);
     }
     const active = await getActive(ctx);
-    if (active && active.slug !== collection.slug && !publish) {
+    if (!existingCollection && active && !draft) {
       throw new ConvexError(
-        `"${active.slug}" is live, not "${collection.slug}". To close it and publish "${collection.slug}", run pnpm collections publish.`
+        `"${active.slug}" is live, not "${collection.slug}". To make "${collection.slug}" the next collection, draft it: pnpm collections draft.`
       );
     }
 
+    const isDraft = existingCollection ? !!existingCollection.draft : !!active;
     const now = Date.now();
     const collectionId =
       existingCollection?._id ??
-      (await ctx.db.insert('collections', { ...collection, active: true, openedAt: now, postersUpdatedAt: now }));
-    if (existingCollection && (existingCollection.title !== collection.title || !existingCollection.active)) {
-      await ctx.db.patch(collectionId, { title: collection.title, active: true, closedAt: undefined });
-    }
-
-    const closed: string[] = [];
-    if (active && active._id !== collectionId) {
-      await ctx.db.patch(active._id, { active: false, closedAt: now });
-      closed.push(active.title);
+      (await ctx.db.insert('collections', {
+        ...collection,
+        active: !isDraft,
+        draft: isDraft || undefined,
+        openedAt: now,
+        postersUpdatedAt: now
+      }));
+    if (existingCollection && existingCollection.title !== collection.title) {
+      await ctx.db.patch(collectionId, { title: collection.title });
     }
 
     const keys = new Set(posters.map((p) => p.key));
@@ -134,7 +135,7 @@ export const sync = internalMutation({
     }
 
     const changed = added + updated + deactivated > 0;
-    if (!changed) return { collection: collection.title, closed, added, updated, deactivated };
+    if (!changed) return { collection: collection.title, draft: isDraft, added, updated, deactivated };
     if (existingCollection) {
       await ctx.db.patch(collectionId, { postersUpdatedAt: Date.now(), removed: [...removed] });
     }
@@ -152,7 +153,7 @@ export const sync = internalMutation({
     }
     await requestRun(ctx, collectionId, { now: true, stale: true });
 
-    return { collection: collection.title, closed, added, updated, deactivated };
+    return { collection: collection.title, draft: isDraft, added, updated, deactivated };
   }
 });
 

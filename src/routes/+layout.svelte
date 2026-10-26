@@ -9,9 +9,12 @@
   import SiteShareButton from '$lib/features/share/SiteShareButton.svelte';
   import { trackPageview } from '$lib/services/analytics';
   import { sound } from '$lib/services/sound.svelte';
+  import { exposeDevMode } from '$lib/state/devMode.svelte';
   import '$lib/styles/index.css';
 
   let { children } = $props();
+
+  exposeDevMode();
 
   const configured = Boolean(PUBLIC_CONVEX_URL);
   if (configured) setupConvex(PUBLIC_CONVEX_URL);
