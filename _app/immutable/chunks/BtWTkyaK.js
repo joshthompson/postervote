@@ -1,0 +1,1 @@
+import{V as e,it as t,rt as n}from"./DC_Uu9G_.js";import{t as r}from"./DaUxJXey.js";var i=`devMode`,a=new class{#e=t(r.get(i)===`on`);get on(){return e(this.#e)}set on(e){n(this.#e,e,!0)}set(e){this.on=e,e?r.set(i,`on`):r.remove(i)}};function o(){window.setDevMode=(e=!0)=>(a.set(e),`Dev mode is ${e?`on: drafts are showing`:`off`}.`)}export{o as n,a as t};
