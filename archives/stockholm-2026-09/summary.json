@@ -1,0 +1,25 @@
+{
+  "slug": "stockholm-2026-09",
+  "title": "Stockholm - September 2026",
+  "openedAt": 1790632899811.8245,
+  "closedAt": 1793568878500,
+  "votes": 4548,
+  "voters": 172,
+  "posters": 77,
+  "top": [
+    {
+      "title": "ADG7 Konsert (Rainbow)",
+      "image": "posters/stockholm-2026-09/037.jpg"
+    },
+    {
+      "title": "Svensk Kortfilm c/o Folkets Bio",
+      "image": "posters/stockholm-2026-09/036.jpg"
+    },
+    {
+      "title": "Doing So Much Better",
+      "image": "posters/stockholm-2026-09/028.jpg"
+    }
+  ],
+  "archivedAt": 1793568899412,
+  "deployment": "prod"
+}
