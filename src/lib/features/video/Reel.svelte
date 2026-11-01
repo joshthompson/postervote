@@ -8,13 +8,13 @@
   import { posterSrc } from '$lib/utils/images';
   import PixelWords from './PixelWords.svelte';
   import TopThree from './TopThree.svelte';
-  import { AT, BEAT_MS, CUES, fitPx, HEIGHT, WIDTH, type Spawn } from './timeline';
+  import { AT, BEAT_MS, ending, fitPx, HEIGHT, WIDTH, type Spawn } from './timeline';
 
   // The winner video, drawn over the stage's polka dots: the logo, the question, posters flying
-  // through, "the votes are in!", the top three, and the site's address. It keeps its own clock from
-  // `startAt` (a performance.now() time, when the music restarts), so every part lands on the beat,
-  // and goes round again after `AT.end`: the end clears to the bare stage it starts on.
-  // `sfx` plays the vote effect on the cues; off when the effects are rendered into the music.
+  // through, "the votes are in!", the top three, the next collection (when there's `next`), and the
+  // site's address. It keeps its own clock from `startAt` (a performance.now() time, when the music
+  // restarts), so every part lands on the beat, and goes round again at the end, which clears to the
+  // bare stage it starts on. `sfx` plays the sound effects; off when they're rendered into the music.
 
   type Finalist = Pick<PosterInfo, '_id' | 'title' | 'image'>;
   let {
@@ -23,8 +23,22 @@
     top,
     name,
     votes,
+    next = null,
     sfx = true
-  }: { startAt: number; spawns: Spawn[]; top: Finalist[]; name: string; votes: number; sfx?: boolean } = $props();
+  }: {
+    startAt: number;
+    spawns: Spawn[];
+    top: Finalist[];
+    name: string;
+    votes: number;
+    /** The collection to vote on next: its name and a few of its posters. */
+    next?: { name: string; posters: Finalist[] } | null;
+    sfx?: boolean;
+  } = $props();
+
+  // Fixed for the run, like the posters.
+  // svelte-ignore state_referenced_locally
+  const end = ending(!!next);
 
   let beat = $state(-1);
   // The beat to the nearest 16th below. What's on screen only changes this often, so the rest of
@@ -36,16 +50,26 @@
     // Cues skipped by a stalled tab stay silent. Each time round starts them over.
     let cue = 0;
     let lap = 0;
+    // The count's tone lasts a while, so it's stopped if the video is.
+    let stopCount = () => {};
     const tick = () => {
       const elapsed = (performance.now() - startAt) / BEAT_MS;
-      const thisLap = Math.max(0, Math.floor(elapsed / AT.end));
+      const thisLap = Math.max(0, Math.floor(elapsed / end.end));
       if (thisLap !== lap) [lap, cue] = [thisLap, 0];
-      beat = elapsed - lap * AT.end;
-      for (; cue < CUES.length && beat >= CUES[cue]; cue++) if (sfx && beat < CUES[cue] + 0.5) sound.vote();
+      beat = elapsed - lap * end.end;
+      for (; cue < end.cues.length && beat >= end.cues[cue].beat; cue++) {
+        const c = end.cues[cue];
+        if (!sfx || beat >= c.beat + 0.5) continue;
+        if ('note' in c) sound.beep(c.note);
+        else stopCount = sound.countUp((c.countUp * BEAT_MS) / 1000);
+      }
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      stopCount();
+    };
   });
 
   // The intro's two lines, each letter dropping in on its own 16th with its own spin.
@@ -55,6 +79,14 @@
 
   // svelte-ignore state_referenced_locally
   const namePx = fitPx(widestWord(`${name}?`), WIDTH - 100, 3);
+  // svelte-ignore state_referenced_locally
+  const nextPx = next ? fitPx(widestWord(next.name), WIDTH - 100, 2) : 1;
+
+  /** Where each of the next collection's posters lands in its fan, from the middle out. */
+  function fanned(i: number, count: number) {
+    const off = i - (count - 1) / 2;
+    return `--x: ${off * 74}px; --y: ${Math.abs(off) * 14}px; --rot: ${off * 8}deg`;
+  }
 
   /** A pile poster's way out when it bursts: away from the middle, whatever its distance. */
   function burst(s: Spawn) {
@@ -86,8 +118,8 @@
     </div>
   {/if}
 
-  {#if now >= AT.logoSmall + 0.5 && now < AT.outroOut + 1}
-    <div class="brand" class:out={now >= AT.outroOut}><Logo px={2} /></div>
+  {#if now >= AT.logoSmall + 0.5 && now < end.outroOut + 1}
+    <div class="brand" class:out={now >= end.outroOut}><Logo px={2} /></div>
   {/if}
 
   {#if now >= AT.question && now < AT.questionOut + 1}
@@ -130,16 +162,34 @@
     </div>
   {/if}
 
-  {#if now >= AT.third && now < AT.outro + 1}
-    <div class="finale" class:leaving={now >= AT.outro}><TopThree {top} {now} /></div>
+  {#if now >= AT.third && now < AT.winnerOut + 1}
+    <div class="finale" class:leaving={now >= AT.winnerOut}><TopThree {top} {now} /></div>
   {/if}
 
   {#if now >= AT.winner && now < AT.winner + 1}
     <div class="flash"></div>
   {/if}
 
-  {#if now >= AT.outro && now < AT.outroOut + 1}
-    <div class="outro" class:out={now >= AT.outroOut}><span class="url">{site}</span></div>
+  {#if next && end.next && now >= end.next.in && now < end.next.out + 1}
+    {@const at = end.next}
+    <div class="next" class:leaving={now >= at.out}>
+      <PixelWords text="Up next" px={3} />
+      <div class="name" style="--in: {at.name - at.in}">
+        <PixelWords text={next.name} px={nextPx} color="white" delay={at.name - at.in} tilt={3} />
+      </div>
+      <div class="fan">
+        {#each next.posters as p, i (p._id)}
+          <img src={posterSrc(p.image)} alt="" style="--d: {at.posters - at.in + i}; {fanned(i, next.posters.length)}" />
+        {/each}
+      </div>
+      <div class="vote-now" style="--in: {at.vote - at.in}">
+        <PixelWords text="Vote now!" px={2} color="var(--yellow)" delay={at.vote - at.in} tilt={4} />
+      </div>
+    </div>
+  {/if}
+
+  {#if now >= end.outro && now < end.outroOut + 1}
+    <div class="outro" class:out={now >= end.outroOut}><span class="url">{site}</span></div>
   {/if}
 </div>
 
@@ -277,7 +327,8 @@
   }
 
   .question,
-  .votes-in {
+  .votes-in,
+  .next {
     position: absolute;
     inset: 120px 24px 40px;
     display: flex;
@@ -295,6 +346,46 @@
   .name {
     background: var(--red);
     box-shadow: 0 20px 50px -12px rgba(255, 59, 92, 0.6);
+    animation: pop calc(var(--beat) * 0.75) var(--spring) calc(var(--beat) * var(--in)) both;
+  }
+  .next {
+    gap: 28px;
+  }
+  /* The next collection's posters fan out one a beat, each flying up into its place. */
+  .fan {
+    position: relative;
+    width: 100%;
+    height: 250px;
+    flex-shrink: 0;
+  }
+  .fan img {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 150px;
+    aspect-ratio: 3 / 4;
+    margin: -100px 0 0 -75px;
+    object-fit: cover;
+    border: 6px solid white;
+    border-radius: 6px;
+    background: #f3ebe2;
+    box-shadow: 0 18px 40px -14px rgba(31, 26, 36, 0.55);
+    translate: var(--x) var(--y);
+    rotate: var(--rot);
+    animation: fan-in var(--beat) var(--spring) calc(var(--beat) * var(--d)) both;
+  }
+  @keyframes fan-in {
+    from {
+      opacity: 0;
+      transform: translateY(700px) rotate(-30deg) scale(0.3);
+    }
+  }
+  .vote-now {
+    padding: 16px 28px 20px;
+    border-radius: 28px;
+    background: var(--ink);
+    box-shadow: var(--shadow-lift);
+    rotate: 3deg;
     animation: pop calc(var(--beat) * 0.75) var(--spring) calc(var(--beat) * var(--in)) both;
   }
   .total {

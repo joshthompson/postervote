@@ -1,6 +1,5 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import beta from '$lib/assets/beta.png';
   import Logo from '$lib/components/pixel/Logo.svelte';
   import { track } from '$lib/services/analytics';
   import MuteButton from './MuteButton.svelte';
@@ -19,9 +18,9 @@
   <a
     class="brand"
     href={resolve('/')}
-    aria-label="Poster Vote! (beta)"
+    aria-label="Poster Vote!"
     onclick={() => track('nav_link_clicked', { destination: 'vote', placement: 'logo' })}
-    ><Logo /><img class="beta" src={beta} alt="" aria-hidden="true" draggable="false" /></a
+    ><Logo /></a
   >
   <nav>
     <NavPill />
@@ -50,21 +49,8 @@
     justify-self: start;
   }
   .brand {
-    position: relative;
     display: inline-block;
     text-decoration: none;
-  }
-  /* Beta tag tucked under the logo's bottom-right corner, drawn at one screen pixel per art pixel. */
-  .beta {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    width: 44px;
-    height: 16px;
-    transform: translate(40%, 60%);
-    image-rendering: crisp-edges;
-    image-rendering: pixelated;
-    user-select: none;
   }
   nav {
     justify-self: stretch;

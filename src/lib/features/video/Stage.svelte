@@ -1,15 +1,17 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import PolkaDots from '$lib/components/layout/PolkaDots.svelte';
-  import { AT, BEAT_MS, HEIGHT, WIDTH } from './timeline';
+  import { BEAT_MS, HEIGHT, WIDTH } from './timeline';
 
   // The video's frame over a black screen that covers the whole page, header and all: the
   // polka dots, with the reel on top (`children`), as large as fits the window. In a window the
   // video's size, that's one CSS pixel per video pixel. `hint` sits in the black under it.
-  // `startAt` is when the video starts (a performance.now() time), so the dots loop with it.
+  // `startAt` is when the video starts (a performance.now() time) and `beats` how long it is, so
+  // the dots loop with it.
 
-  let { startAt, children, hint }: { startAt?: number; children?: Snippet; hint?: Snippet } = $props();
-  const loop = $derived(startAt === undefined ? undefined : { start: startAt, seconds: (AT.end * BEAT_MS) / 1000 });
+  let { startAt, beats, children, hint }: { startAt?: number; beats: number; children?: Snippet; hint?: Snippet } =
+    $props();
+  const loop = $derived(startAt === undefined ? undefined : { start: startAt, seconds: (beats * BEAT_MS) / 1000 });
 
   let innerWidth = $state(WIDTH);
   let innerHeight = $state(HEIGHT);

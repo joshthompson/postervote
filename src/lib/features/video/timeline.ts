@@ -38,20 +38,58 @@ export const AT = {
   /** "And the winner is…" */
   drumroll: 74,
   winner: 80,
-  /** The winner's screen spins away for the site's address… */
-  outro: 89,
-  /** …which drops away with the logo, leaving the bare stage the video starts on, so it loops. */
-  outroOut: 95,
-  /** The end, which is the start again: a whole number of the music's 4-bar loops. */
-  end: 96
+  /** The winner's screen spins away, for the next collection if there is one, else the site's address. */
+  winnerOut: 89
 } as const;
 
 /** Beats from a place's label to its poster flying in, and to it moving down to the podium. */
 export const POSTER_IN = 1;
 export const PARK = 7;
 
-/** Beats the zap and stab sound on: the collection's name, the votes being in, each reveal. */
-export const CUES = [AT.name, AT.votesIn, AT.third + POSTER_IN, AT.second + POSTER_IN, AT.winner];
+/**
+ * The notes (MIDI) the beeps are on: the places climbing to the winner's (A4, E5, A5), and C5 for
+ * the rest. All in A minor, so they sit with the music.
+ */
+const NOTE = { cue: 72, third: 69, second: 76, winner: 81 };
+
+/** A sound effect: a beep on a note, or the vote count's tone for `countUp` beats. */
+export type Cue = { beat: number } & ({ note: number } | { countUp: number });
+
+/** Beats the sound effects start on, in order: the collection's name, the count, the votes being in, each reveal. */
+const CUES: Cue[] = [
+  { beat: AT.name, note: NOTE.cue },
+  { beat: AT.slideshow, countUp: AT.counted - AT.slideshow },
+  { beat: AT.votesIn, note: NOTE.cue },
+  { beat: AT.third + POSTER_IN, note: NOTE.third },
+  { beat: AT.second + POSTER_IN, note: NOTE.second },
+  { beat: AT.winner, note: NOTE.winner }
+];
+
+/** The most of the next collection's posters shown, fanned out. */
+export const NEXT_POSTERS = 5;
+
+/**
+ * When the end of the video happens, which depends on whether it promotes the next collection:
+ * that comes between the winner and the site's address, and takes one more of the music's 4-bar loops.
+ */
+export function ending(next: boolean) {
+  const outro = AT.winnerOut + (next ? 16 : 0);
+  const at = AT.winnerOut;
+  return {
+    /** "Up next", its name, its posters fanning out a beat apart, "Vote now!", and away. */
+    next: next ? { in: at, name: at + 1, posters: at + 2, vote: at + 2 + NEXT_POSTERS + 1, out: outro - 1 } : null,
+    /** The site's address… */
+    outro,
+    /** …which drops away with the logo, leaving the bare stage the video starts on, so it loops. */
+    outroOut: outro + 6,
+    /** The end, which is the start again: a whole number of the music's 4-bar loops. */
+    end: outro + 7,
+    /** Beats the sound effects start on, the next collection's name too. */
+    cues: next ? [...CUES, { beat: at + 1, note: NOTE.cue }] : CUES
+  };
+}
+
+export type Ending = ReturnType<typeof ending>;
 
 export type Spawn = {
   key: number;
@@ -72,7 +110,7 @@ export type Spawn = {
 
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 
-function shuffled<T>(items: T[]): T[] {
+export function shuffled<T>(items: T[]): T[] {
   const a = [...items];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));

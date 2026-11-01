@@ -1,7 +1,7 @@
 import { storage } from './storage';
 
-// A tiny techno loop and vote sound effect, synthesised with the Web Audio API: live on the
-// site, or offline into a file for the winner video (`renderMusic`).
+// A tiny techno loop, the vote sound effect and the winner video's effects, synthesised with the
+// Web Audio API: live on the site, or offline into a file for the winner video (`renderMusic`).
 //
 // Browsers only allow audio after a user gesture, so nothing plays until `unlock()` runs
 // from the first click or key press. Muting suspends the whole AudioContext (music + effects),
@@ -21,6 +21,8 @@ const BASS_OCTAVE_UP = new Set([3, 11]);
 // The vote effect plays this chord shape (A minor, an octave up) on whatever bar the loop is on,
 // shifted with the bass exactly like the stabs, so it always matches the track: Am Am Cm Gm.
 const VOTE_CHORD = [69, 72, 76, 81];
+/** Ticks in the winner video's vote count: the last ones are about 70 ms apart. */
+const COUNT_TICKS = 60;
 /** Semitones to shift the A-rooted chord shapes by for a given bar. */
 const barShift = (bar: number) => BASS_ROOTS[bar] - BASS_ROOTS[0];
 
@@ -29,6 +31,7 @@ class Synth {
   private music: GainNode;
   private sfx: GainNode;
   private echo: GainNode;
+  private shortEcho: GainNode;
   private noise: AudioBuffer;
 
   constructor(
@@ -58,6 +61,19 @@ class Synth {
     this.echo = ctx.createGain();
     this.echo.connect(delay).connect(tone).connect(feedback).connect(delay);
     tone.connect(master);
+
+    // A shorter, quieter 8th-note echo for the beeps: it dies away in about half the time.
+    const shortDelay = ctx.createDelay(1);
+    shortDelay.delayTime.value = STEP * 2;
+    const shortFeedback = ctx.createGain();
+    shortFeedback.gain.value = 0.25;
+    const shortTone = ctx.createBiquadFilter();
+    shortTone.type = 'lowpass';
+    shortTone.frequency.value = 2500;
+    this.shortEcho = ctx.createGain();
+    this.shortEcho.gain.value = 0.45;
+    this.shortEcho.connect(shortDelay).connect(shortTone).connect(shortFeedback).connect(shortDelay);
+    shortTone.connect(master);
 
     this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const data = this.noise.getChannelData(0);
@@ -105,6 +121,56 @@ class Synth {
 
     this.stab(t + 0.12, chord, this.sfx, 0.3, 0.5);
     this.hat(t + 0.12, 0.25, 0.3, this.sfx);
+  }
+
+  /** A short beep at `note` (MIDI), with a little echo. Returns a stop, for a live one cut short. */
+  beep(t: number, note: number) {
+    const ctx = this.ctx;
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.value = midi(note);
+    // The filter closing as it fades takes the buzz off the square wave.
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(4000, t);
+    lp.frequency.exponentialRampToValueAtTime(700, t + 0.25);
+    const g = this.envelope(t, 0.004, 0.25, 0.25);
+    osc.connect(lp).connect(g);
+    g.connect(this.sfx);
+    g.connect(this.shortEcho);
+    osc.start(t);
+    osc.stop(t + 0.3);
+    return () => g.disconnect();
+  }
+
+  /**
+   * The vote count's ticker, like the column on Pointless but going up: a short tick each time the
+   * count passes another of `COUNT_TICKS` steps, each a step higher (from A3 to A5), so they come
+   * faster and faster with the count (which goes as the square of the time), then a beep as it lands
+   * after `duration` seconds. Returns a stop, for a live one cut short.
+   */
+  countUp(t: number, duration: number) {
+    const ctx = this.ctx;
+    const bus = ctx.createGain();
+    bus.connect(this.sfx);
+    for (let i = 0; i < COUNT_TICKS; i++) {
+      const at = t + duration * Math.sqrt(i / COUNT_TICKS);
+      const osc = ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.value = midi(57 + (24 * i) / COUNT_TICKS);
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 2500;
+      const g = this.envelope(at, 0.002, 0.035, 0.18);
+      osc.connect(lp).connect(g).connect(bus);
+      osc.start(at);
+      osc.stop(at + 0.045);
+    }
+    const stopBeep = this.beep(t + duration, 81);
+    return () => {
+      bus.disconnect();
+      stopBeep();
+    };
   }
 
   private envelope(t: number, attack: number, decay: number, peak: number) {
@@ -253,6 +319,22 @@ class Sound {
     this.synth.vote(ctx.currentTime, this.barAt(ctx.currentTime));
   }
 
+  /** A short beep at `note` (MIDI), for the winner video's cues. */
+  beep(note: number) {
+    this.unlock();
+    const ctx = this.ctx;
+    if (!ctx || this.muted) return;
+    this.synth.beep(ctx.currentTime, note);
+  }
+
+  /** The winner video's vote count tone, for `seconds` from now. Returns a stop, for when the video is. */
+  countUp(seconds: number) {
+    this.unlock();
+    const ctx = this.ctx;
+    if (!ctx || this.muted) return () => {};
+    return this.synth.countUp(ctx.currentTime, seconds);
+  }
+
   private schedule() {
     const ctx = this.ctx!;
     while (this.nextTime < ctx.currentTime + LOOKAHEAD) {
@@ -271,18 +353,25 @@ class Sound {
 
 export const sound = new Sound();
 
+/** A winner video effect, at `at` seconds: a beep on a MIDI note, or the vote count's tone for `countUp` seconds. */
+export type VideoEffect = { at: number } & ({ note: number } | { countUp: number });
+
 /**
- * The loop from its first beat for `seconds`, with the vote effect at each of `zaps` (seconds),
- * rendered offline (faster than real time, no gesture needed), to play on repeat: `seconds` should
+ * The loop from its first beat for `seconds`, with the winner video's `effects`, rendered offline (faster than real time, no gesture needed), to play on repeat: `seconds` should
  * be a whole number of 4-bar loops. It's rendered twice over and the second time round kept, so it
  * starts with the end's echoes still ringing and loops without a seam.
  */
-export async function renderMusic(seconds: number, zaps: number[], sampleRate = 48_000) {
+export async function renderMusic(seconds: number, effects: VideoEffect[], sampleRate = 48_000) {
   const length = Math.round(seconds * sampleRate);
   const ctx = new OfflineAudioContext(2, length * 2, sampleRate);
   const synth = new Synth(ctx, ctx.destination);
   for (let step = 0; step * STEP < seconds * 2; step++) synth.playStep(step % 64, step * STEP);
-  for (const lap of [0, seconds]) for (const t of zaps) synth.vote(lap + t, Math.floor(t / STEP / 16) % 4);
+  for (const lap of [0, seconds]) {
+    for (const e of effects) {
+      if ('note' in e) synth.beep(lap + e.at, e.note);
+      else synth.countUp(lap + e.at, e.countUp);
+    }
+  }
   const twice = await ctx.startRendering();
   const once = new AudioBuffer({ length, numberOfChannels: 2, sampleRate });
   for (let c = 0; c < 2; c++) once.copyToChannel(twice.getChannelData(c).subarray(length), c);

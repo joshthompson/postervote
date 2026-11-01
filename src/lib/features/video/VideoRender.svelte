@@ -1,16 +1,17 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { page } from '$app/state';
+  import type { PosterInfo } from '$lib/services/posters.svelte';
   import { renderMusic } from '$lib/services/sound.svelte';
   import Reel from './Reel.svelte';
   import Stage from './Stage.svelte';
   import { takeOverClock } from './clock';
-  import { preloadPosters, useVideoData } from './data.svelte';
-  import { AT, BEAT_MS, CUES, plan, type Spawn } from './timeline';
+  import { pickNext, preloadPosters, useNextCollection, useVideoData } from './data.svelte';
+  import { BEAT_MS, ending, plan, type Spawn } from './timeline';
 
   // The winner video for `pnpm video` (scripts/render-video.mjs) to render, one frame at a time.
-  // It loads the collection in the URL (`?collection=<slug>&name=<name in the question>`),
-  // preloads its posters, takes over the page's clock, and then waits on `window.__video`: the
+  // It loads the collection in the URL (`?collection=<slug>&name=<name in the question>`, and
+  // `&next=<slug>&nextName=<its name>` to end on the collection to vote on next), preloads its posters, takes over the page's clock, and then waits on `window.__video`: the
   // script starts it, moves it on a frame at a time and screenshots each one, and asks for the
   // music separately. Open it in a window the video's size (540 × 960 at 2×) for a 1080 × 1920 frame.
 
@@ -20,6 +21,8 @@
     collection: string;
     votes: number;
     top: string[];
+    /** The name of the collection it ends on, to vote on next, if any. */
+    next: string | null;
     /** Starts the video at its first frame. */
     start: () => Promise<void>;
     /** Moves the video on by `ms` and settles. */
@@ -34,29 +37,38 @@
   const slug = params.get('collection') ?? undefined;
   const data = useVideoData(() => slug);
   const name = $derived(params.get('name') || data.collection?.title || '');
+  const nextSlug = params.get('next') ?? undefined;
+  const nextData = useNextCollection(() => nextSlug);
 
   type Ranked = NonNullable<typeof data.ranked>;
+  type Next = { name: string; posters: PosterInfo[] };
   // Fixed when the video starts, so votes coming in while it renders don't change it.
-  let run = $state<{ startAt: number; spawns: Spawn[]; top: Ranked; votes: number } | null>(null);
+  let run = $state<{ startAt: number; spawns: Spawn[]; top: Ranked; votes: number; next: Next | null } | null>(null);
   let images: HTMLImageElement[] = [];
   let prepared = false;
 
   $effect(() => {
-    if (data.error) expose({ ready: false, error: data.error.message });
+    const error = data.error ?? nextData.error;
+    if (error) expose({ ready: false, error: error.message });
     else if (data.missing) expose({ ready: false, error: `No collection "${slug ?? 'active'}"` });
-    else if (data.ranked && data.collection && !prepared) {
+    else if (nextData.missing) expose({ ready: false, error: `No collection "${nextSlug}"` });
+    else if (data.ranked && data.collection && (!nextSlug || (nextData.posters && nextData.title)) && !prepared) {
       prepared = true;
-      prepare(data.ranked, data.collection.title, data.votes);
+      const next = nextSlug
+        ? { name: params.get('nextName') || nextData.title || '', posters: pickNext(nextData.posters ?? []) }
+        : null;
+      prepare(data.ranked, data.collection.title, data.votes, next);
     }
   });
 
-  async function prepare(ranked: Ranked, title: string, votes: number) {
-    images = await preloadPosters(ranked);
+  async function prepare(ranked: Ranked, title: string, votes: number, next: Next | null) {
+    images = await preloadPosters([...ranked, ...(next?.posters ?? [])]);
     await Promise.all([document.fonts.load('64px "Remi Pop"'), document.fonts.load('800 56px "Bricolage Grotesque"')]);
     // A moment for the polka dots to load their drawings and start.
     await new Promise((resolve) => setTimeout(resolve, 500));
     const clock = takeOverClock();
-    const seconds = (AT.end * BEAT_MS) / 1000;
+    const end = ending(!!next);
+    const seconds = (end.end * BEAT_MS) / 1000;
     expose({
       ready: true,
       api: {
@@ -64,13 +76,18 @@
         collection: title,
         votes,
         top: ranked.slice(0, 3).map((p) => p.title),
+        next: next?.name ?? null,
         async start() {
-          run = { startAt: clock.now(), spawns: plan(ranked.slice(3)), top: ranked.slice(0, 3), votes };
+          run = { startAt: clock.now(), spawns: plan(ranked.slice(3)), top: ranked.slice(0, 3), votes, next };
           await tick();
         },
         advance: clock.advance,
         async music() {
-          const buffer = await renderMusic(seconds, CUES.map((beat) => (beat * BEAT_MS) / 1000));
+          const sec = (beats: number) => (beats * BEAT_MS) / 1000;
+          const effects = end.cues.map((c) =>
+            'note' in c ? { at: sec(c.beat), note: c.note } : { at: sec(c.beat), countUp: sec(c.countUp) }
+          );
+          const buffer = await renderMusic(seconds, effects);
           return wav(buffer);
         }
       }
@@ -109,8 +126,8 @@
   }
 </script>
 
-<Stage startAt={run?.startAt}>
+<Stage startAt={run?.startAt} beats={ending(!!nextSlug).end}>
   {#if run}
-    <Reel startAt={run.startAt} spawns={run.spawns} top={run.top} {name} votes={run.votes} sfx={false} />
+    <Reel startAt={run.startAt} spawns={run.spawns} top={run.top} {name} votes={run.votes} next={run.next} sfx={false} />
   {/if}
 </Stage>

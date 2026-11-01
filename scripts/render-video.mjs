@@ -7,6 +7,8 @@
 //   pnpm video                          → the active collection, from `pnpm dev` (keep it running)
 //   pnpm video stockholm-2026-09        → that collection
 //   --name 'September 2026'             → the name in the question (default: the collection's title)
+//   --next stockholm-2026-10            → end on that collection (a draft or the live one), to vote on next
+//   --next-name 'October 2026'          → its name there (default: its title)
 //   --fps 60                            → frames per second (default 30)
 //   --out path/to/video.mp4             → where to save it (default videos/<slug>.mp4)
 //   --url https://postervote.com        → render from another copy of the site (default the dev server)
@@ -24,6 +26,8 @@ const { values: opts, positionals } = parseArgs({
   allowPositionals: true,
   options: {
     name: { type: 'string' },
+    next: { type: 'string' },
+    'next-name': { type: 'string' },
     fps: { type: 'string', default: '30' },
     out: { type: 'string' },
     url: { type: 'string', default: 'http://localhost:5173' }
@@ -59,6 +63,8 @@ page.on('pageerror', (e) => console.error(`Page error: ${e.message}`));
 const query = new URLSearchParams();
 if (slug) query.set('collection', slug);
 if (opts.name) query.set('name', opts.name);
+if (opts.next) query.set('next', opts.next);
+if (opts['next-name']) query.set('nextName', opts['next-name']);
 await page.goto(`${base}/admin/video/render?${query}`);
 console.log('Loading the collection and its posters…');
 const status = await page.waitForFunction(() => window.__video && { ready: window.__video.ready, error: window.__video.error }, null, {
@@ -71,10 +77,11 @@ if (!ready) {
   process.exit(1);
 }
 const info = await page.evaluate(() => {
-  const { seconds, collection, votes, top } = window.__video.api;
-  return { seconds, collection, votes, top };
+  const { seconds, collection, votes, top, next } = window.__video.api;
+  return { seconds, collection, votes, top, next };
 });
 console.log(`${info.collection}: ${info.votes.toLocaleString('en-GB')} votes. Top three: ${info.top.join(' · ')}`);
+if (info.next) console.log(`Then up next: ${info.next}`);
 
 const out = path.resolve(opts.out ?? path.join(root, 'videos', `${slug ?? 'active'}.mp4`));
 await fs.mkdir(path.dirname(out), { recursive: true });

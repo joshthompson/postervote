@@ -100,12 +100,12 @@ export type CollectionEntry = {
 };
 
 /**
- * Every collection: drafts first (in dev mode only), then the live one, then the closed ones,
- * most recently closed first. A collection archived but not yet cleared from Convex is shown from
- * its archive. While Convex hasn't answered (or can't), `data` has the archived ones alone.
+ * Every collection: drafts first (in dev mode, or with `drafts`), then the live one, then the
+ * closed ones, most recently closed first. A collection archived but not yet cleared from Convex is
+ * shown from its archive. While Convex hasn't answered (or can't), `data` has the archived ones alone.
  */
-export function useCollections() {
-  const query = useQuery(api.collections.list, () => ({ drafts: devMode.on }));
+export function useCollections({ drafts = false }: { drafts?: boolean } = {}) {
+  const query = useQuery(api.collections.list, () => ({ drafts: drafts || devMode.on }));
   const data = $derived.by((): CollectionEntry[] => {
     const archived = new Set(summaries.map((s) => s.slug));
     const all: CollectionEntry[] = [...(query.data ?? []).filter((c) => !archived.has(c.slug)), ...summaries.map((s) => ({ ...s, active: false, draft: false }))];
