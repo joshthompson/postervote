@@ -59,6 +59,9 @@ export const en = {
     doneBody: (pairs: number) =>
       `You’ve been through all ${num(pairs)} pairs of the current posters. Come back when new ones go up.`,
     seeRankings: 'See the rankings →',
+    // The link to a just-archived collection's results.
+    resultsIn: 'The results are in',
+    seeWinners: 'See the winners →',
     seenAllTitle: 'You’ve voted on every poster!',
     seenAllBody: '(But there are still many more different combinations you can vote on)',
     continueVoting: 'Continue voting!',

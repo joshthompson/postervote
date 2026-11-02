@@ -52,6 +52,9 @@ export const sv: Messages = {
     doneBody: (pairs: number) =>
       `Du har gått igenom alla ${num(pairs)} par av de nuvarande affischerna. Kom tillbaka när nya dyker upp.`,
     seeRankings: 'Se topplistan →',
+    // The link to a just-archived collection's results.
+    resultsIn: 'Resultaten är här',
+    seeWinners: 'Se vinnarna →',
     seenAllTitle: 'Du har röstat på alla affischer!',
     seenAllBody: '(Men det finns fortfarande många fler kombinationer att rösta på)',
     continueVoting: 'Fortsätt rösta!',

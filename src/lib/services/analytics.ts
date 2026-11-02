@@ -84,7 +84,7 @@ export type Events = {
   };
   nav_link_clicked: {
     destination: NavDestination;
-    placement: 'logo' | 'header_pill' | 'menu' | 'vote_message' | 'error_page' | 'collections_page';
+    placement: 'logo' | 'header_pill' | 'menu' | 'vote_message' | 'vote_intro' | 'error_page' | 'collections_page';
     /** The collection a link to its page (or a vote link) is for. */
     collection?: string;
   };

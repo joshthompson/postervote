@@ -9,6 +9,8 @@
   import MessageCard from '$lib/components/ui/MessageCard.svelte';
   import Pill from '$lib/components/ui/Pill.svelte';
   import PixelText from '$lib/components/pixel/PixelText.svelte';
+  import { recentlyArchived } from '$lib/features/collections/archives.svelte';
+  import RecentResults from '$lib/features/collections/RecentResults.svelte';
   import DesignerChoice from '$lib/features/designer/DesignerChoice.svelte';
   import { posterHref, posterNames } from '$lib/features/results/links';
   import { designer } from '$lib/state/designer.svelte';
@@ -28,9 +30,11 @@
   import type { Poster } from './types';
 
   // The voting screen: asks the designer question on a first visit, waits for a click to start
-  // (which also starts the music), then shows pair after pair.
+  // (which also starts the music), then shows pair after pair. For ten days after a collection is
+  // archived, the intro also links to its results.
 
   const me = voterId();
+  const recent = recentlyArchived();
   location(); // start the lookup now so it's ready by the first vote
   const client = useConvexClient();
   const posters = usePosters(() => undefined);
@@ -228,10 +232,12 @@
       <h2 class="question"><PixelText text={i18n.t.designerQuestion} /></h2>
       <DesignerChoice staggered onchoose={answer} />
     </div>
+    {#if recent}<div class="promo"><RecentResults {recent} delay={0.6} /></div>{/if}
   {:else if !started}
     <div class="intro">
       <span class="wobbly"><Button label={t.start} onclick={() => start('start_button')} /></span>
     </div>
+    {#if recent}<div class="promo"><RecentResults {recent} delay={0.3} /></div>{/if}
   {:else if session.phase === 'done'}
     <MessageCard title={t.doneTitle}>
       <p>{t.doneBody(session.totalPairs)}</p>
@@ -394,6 +400,12 @@
     justify-items: center;
     gap: clamp(24px, 4dvh, 40px);
     text-align: center;
+  }
+  /* In the bottom row, below the centred intro, clear of the corner buttons. */
+  .promo {
+    display: grid;
+    justify-items: center;
+    margin-bottom: clamp(56px, 10dvh, 120px);
   }
   .question {
     margin: 0;

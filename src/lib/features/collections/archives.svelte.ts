@@ -31,6 +31,13 @@ export const summaries: Summary[] = Object.values(summaryFiles).sort(
   (a, b) => (b.closedAt ?? b.archivedAt) - (a.closedAt ?? a.archivedAt)
 );
 
+/** How long after a collection is archived the voting screen points to its results. */
+const RECENT_MS = 10 * 24 * 60 * 60 * 1000;
+
+/** The most recently archived collection, if it was archived in the last ten days. */
+export const recentlyArchived = (now = Date.now()): Summary | undefined =>
+  summaries.filter((s) => now - s.archivedAt < RECENT_MS).sort((a, b) => b.archivedAt - a.archivedAt)[0];
+
 /** Whether `slug` is an archived collection, so the site reads it from its archive instead of Convex. */
 export const isArchived = (slug: string | null | undefined): slug is string => !!slug && resultsPath(slug) in resultFiles;
 
