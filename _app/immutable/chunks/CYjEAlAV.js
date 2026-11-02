@@ -1,0 +1,1 @@
+import{pt as e}from"./DC_Uu9G_.js";e();
