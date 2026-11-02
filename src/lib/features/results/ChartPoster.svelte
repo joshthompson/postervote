@@ -69,7 +69,7 @@
     box-shadow:
       0 0 0 3px var(--ring),
       0 0 0 5px white,
-      0 10px 24px -8px rgba(31, 26, 36, 0.6);
+      0 10px 24px -8px color-mix(in srgb, var(--ink) 60%, transparent);
   }
   img {
     width: 100%;

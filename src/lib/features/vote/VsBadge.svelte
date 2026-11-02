@@ -25,8 +25,8 @@
     width: clamp(48px, 5vw, 68px);
     aspect-ratio: 1;
     border-radius: 50%;
-    background: var(--yellow);
-    box-shadow: 0 8px 24px -6px rgba(255, 176, 0, 0.7);
+    background: var(--accent-2);
+    box-shadow: 0 8px 24px -6px color-mix(in srgb, var(--accent-2) 70%, transparent);
     animation:
       vs-in 0.7s var(--spring) 0.55s both,
       wobble 3s ease-in-out 1.3s infinite;

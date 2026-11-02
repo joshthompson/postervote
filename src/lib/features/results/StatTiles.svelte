@@ -42,7 +42,7 @@
   /* Lift by whole pixels only: rotating or scaling text resamples it and it blurs. */
   .stat:hover {
     transform: translateY(-4px);
-    box-shadow: 0 24px 44px -20px rgba(31, 26, 36, 0.5);
+    box-shadow: 0 24px 44px -20px color-mix(in srgb, var(--ink) 50%, transparent);
   }
   strong {
     /* Pixel digits vary from 26 to 30 art px tall; a fixed row keeps the labels lined up. */
@@ -59,7 +59,7 @@
     }
   }
   .stat:nth-child(odd) strong {
-    color: var(--red);
+    color: var(--accent);
   }
   .stat > span {
     display: block;

@@ -2,7 +2,7 @@
   // A thin horizontal bar filled to `value` percent (0–100).
   // `fill` is any CSS background; the default runs yellow to red.
 
-  let { value, fill = 'linear-gradient(90deg, var(--yellow), var(--red))' }: { value: number; fill?: string } =
+  let { value, fill = 'linear-gradient(90deg, var(--accent-2), var(--accent))' }: { value: number; fill?: string } =
     $props();
 </script>
 
@@ -12,7 +12,7 @@
   .meter {
     height: 8px;
     border-radius: 99px;
-    background: rgba(31, 26, 36, 0.08);
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
     overflow: hidden;
   }
   i {

@@ -172,8 +172,8 @@
     background: var(--card);
     border-radius: 6px;
     box-shadow:
-      0 2px 4px rgba(31, 26, 36, 0.06),
-      0 20px 50px -12px rgba(31, 26, 36, 0.35);
+      0 2px 4px color-mix(in srgb, var(--ink) 6%, transparent),
+      0 20px 50px -12px color-mix(in srgb, var(--ink) 35%, transparent);
     overflow: hidden;
     transition:
       transform 0.45s var(--spring),
@@ -188,7 +188,7 @@
     object-fit: cover;
     border-radius: 2px;
     user-select: none;
-    background: #f3ebe2;
+    background: color-mix(in srgb, var(--ink) 5%, var(--paper));
   }
 
   /* Only where there's a real hover. A touch screen keeps the last tapped poster "hovered", so
@@ -197,15 +197,15 @@
     .vote:not(:disabled):hover .frame {
       transform: scale(1.045) rotate(calc(var(--rot) * -1));
       box-shadow:
-        0 0 0 5px var(--red),
-        0 30px 70px -14px rgba(255, 59, 92, 0.55);
+        0 0 0 5px var(--accent),
+        0 30px 70px -14px color-mix(in srgb, var(--accent) 55%, transparent);
     }
   }
   .vote:not(:disabled):focus-visible .frame {
     transform: scale(1.045) rotate(calc(var(--rot) * -1));
     box-shadow:
-      0 0 0 5px var(--red),
-      0 30px 70px -14px rgba(255, 59, 92, 0.55);
+      0 0 0 5px var(--accent),
+      0 30px 70px -14px color-mix(in srgb, var(--accent) 55%, transparent);
   }
   .vote:not(:disabled):active .frame {
     transform: scale(0.97);
@@ -213,8 +213,8 @@
   .chosen .frame {
     transform: scale(1.06) rotate(calc(var(--rot) * -1));
     box-shadow:
-      0 0 0 7px var(--red),
-      0 30px 80px -10px rgba(255, 59, 92, 0.6);
+      0 0 0 7px var(--accent),
+      0 30px 80px -10px color-mix(in srgb, var(--accent) 60%, transparent);
   }
   .rejected .frame {
     transform: scale(0.9);
@@ -250,14 +250,14 @@
     padding: 2px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.85);
-    box-shadow: 0 4px 14px -4px rgba(31, 26, 36, 0.45);
+    box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--ink) 45%, transparent);
     backdrop-filter: blur(4px);
   }
   .bar i {
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: var(--red);
+    background: var(--accent);
     transform-origin: left;
     animation: grow 1.1s var(--smooth) both;
   }

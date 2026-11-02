@@ -99,7 +99,7 @@
     list-style: none;
     background: var(--ink);
     border-radius: 20px;
-    box-shadow: 0 20px 40px -16px rgba(31, 26, 36, 0.6);
+    box-shadow: 0 20px 40px -16px color-mix(in srgb, var(--ink) 60%, transparent);
     transform-origin: top right;
     animation: drop 0.35s var(--spring) both;
   }
@@ -121,6 +121,6 @@
   }
   a:hover,
   a[aria-current='page'] {
-    background: var(--red);
+    background: var(--accent);
   }
 </style>

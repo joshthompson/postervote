@@ -189,10 +189,10 @@
     overflow: visible;
   }
   .grid {
-    stroke: rgba(31, 26, 36, 0.08);
+    stroke: color-mix(in srgb, var(--ink) 8%, transparent);
   }
   .axis {
-    stroke: rgba(31, 26, 36, 0.35);
+    stroke: color-mix(in srgb, var(--ink) 35%, transparent);
     stroke-width: 1.5;
   }
   text {
@@ -201,7 +201,7 @@
     font-weight: 600;
   }
   .label.marked {
-    fill: var(--red);
+    fill: var(--accent);
     font-weight: 800;
   }
   .peak {
@@ -276,7 +276,7 @@
   .sum {
     margin-top: 3px;
     padding-top: 5px;
-    border-top: 1px solid rgba(255, 247, 238, 0.2);
+    border-top: 1px solid color-mix(in srgb, var(--paper) 20%, transparent);
   }
   details {
     margin-top: 10px;
@@ -297,7 +297,7 @@
   td {
     padding: 4px 8px;
     text-align: right;
-    border-bottom: 1px solid rgba(31, 26, 36, 0.08);
+    border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
   }
   tbody th {
     text-align: left;

@@ -58,7 +58,7 @@
     background: var(--glass);
     backdrop-filter: blur(8px);
     border-radius: 18px;
-    box-shadow: 0 8px 20px -16px rgba(31, 26, 36, 0.5);
+    box-shadow: 0 8px 20px -16px color-mix(in srgb, var(--ink) 50%, transparent);
     transition:
       transform 0.3s var(--spring),
       box-shadow 0.3s;
@@ -68,13 +68,13 @@
     text-decoration: none;
   }
   .clickable:focus-visible {
-    outline: 3px solid var(--red);
+    outline: 3px solid var(--accent);
     outline-offset: 2px;
   }
   /* Lift by whole pixels only: rotating or scaling text resamples it and it blurs. */
   .row:hover {
     transform: translateY(-2px);
-    box-shadow: 0 14px 30px -16px rgba(255, 59, 92, 0.5);
+    box-shadow: 0 14px 30px -16px color-mix(in srgb, var(--accent) 50%, transparent);
   }
   .rank {
     font-weight: 800;
@@ -83,7 +83,7 @@
     color: var(--muted);
   }
   .rank.top {
-    color: var(--red);
+    color: var(--accent);
   }
   img {
     width: 54px;

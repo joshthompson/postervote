@@ -16,7 +16,7 @@
     margin: 0 0 3rem;
   }
   .note :global(a) {
-    color: var(--red);
+    color: var(--accent);
     font-weight: 700;
   }
 </style>

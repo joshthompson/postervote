@@ -50,13 +50,13 @@
     transform: scale(0.97);
   }
   .btn:focus-visible {
-    outline: 4px solid var(--yellow);
+    outline: 4px solid var(--accent-2);
     outline-offset: 4px;
   }
 
   .red {
-    background: var(--red);
-    box-shadow: 0 20px 50px -12px rgba(255, 59, 92, 0.6);
+    background: var(--accent);
+    box-shadow: 0 20px 50px -12px color-mix(in srgb, var(--accent) 60%, transparent);
   }
   .red:hover {
     background: var(--ink);
@@ -65,7 +65,7 @@
     background: var(--ink);
   }
   .ink:hover {
-    background: var(--red);
+    background: var(--accent);
   }
   .paper {
     background: var(--paper);
@@ -76,7 +76,7 @@
   }
   .btn.pressed,
   .btn.pressed:hover {
-    background: var(--red);
-    border-color: var(--red);
+    background: var(--accent);
+    border-color: var(--accent);
   }
 </style>

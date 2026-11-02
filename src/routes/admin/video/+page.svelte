@@ -14,6 +14,6 @@
 </svelte:head>
 
 <Page>
-  <PageTitle text="Video" color="var(--red)" />
+  <PageTitle text="Video" color="var(--accent)" />
   <VideoStudio />
 </Page>

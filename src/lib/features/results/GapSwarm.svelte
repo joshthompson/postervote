@@ -81,7 +81,7 @@
           {x}
           y={mid + y}
           {r}
-          ring={p.gap > 0 ? 'var(--red)' : 'var(--ink)'}
+          ring={p.gap > 0 ? 'var(--accent)' : 'var(--ink)'}
           lines={lines(p)}
           align={x < 110 ? 'start' : x > width - 110 ? 'end' : 'center'}
           delay={Math.min(i, 30) * 25}
@@ -102,10 +102,10 @@
     overflow: visible;
   }
   .side.others {
-    fill: rgba(31, 26, 36, 0.04);
+    fill: color-mix(in srgb, var(--ink) 4%, transparent);
   }
   .side.designers {
-    fill: rgba(255, 59, 92, 0.06);
+    fill: color-mix(in srgb, var(--accent) 6%, transparent);
   }
   .even {
     stroke: var(--muted);
@@ -113,10 +113,10 @@
     stroke-dasharray: 3 4;
   }
   .axis {
-    stroke: rgba(31, 26, 36, 0.12);
+    stroke: color-mix(in srgb, var(--ink) 12%, transparent);
   }
   .tick {
-    stroke: rgba(31, 26, 36, 0.25);
+    stroke: color-mix(in srgb, var(--ink) 25%, transparent);
   }
   text {
     fill: var(--muted);
@@ -147,6 +147,6 @@
     background: var(--ink);
   }
   .swatch.designers {
-    background: var(--red);
+    background: var(--accent);
   }
 </style>

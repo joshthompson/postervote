@@ -134,7 +134,7 @@
     border-radius: 99px;
     background: var(--glass);
     backdrop-filter: blur(8px);
-    box-shadow: 0 8px 20px -16px rgba(31, 26, 36, 0.5);
+    box-shadow: 0 8px 20px -16px color-mix(in srgb, var(--ink) 50%, transparent);
     font-size: 15px;
     animation: rise 0.6s var(--spring) both;
   }
@@ -210,10 +210,10 @@
   /* Lift by whole pixels only: rotating or scaling text resamples it and it blurs. */
   .pick:hover {
     transform: translateY(-4px);
-    box-shadow: 0 24px 44px -20px rgba(31, 26, 36, 0.5);
+    box-shadow: 0 24px 44px -20px color-mix(in srgb, var(--ink) 50%, transparent);
   }
   .pick:focus-visible {
-    outline: 3px solid var(--red);
+    outline: 3px solid var(--accent);
     outline-offset: 2px;
   }
   .where {
@@ -238,13 +238,13 @@
     object-fit: cover;
     border: 4px solid white;
     border-radius: 6px;
-    box-shadow: 0 14px 30px -14px rgba(31, 26, 36, 0.5);
+    box-shadow: 0 14px 30px -14px color-mix(in srgb, var(--ink) 50%, transparent);
     margin: 4px 0;
     /* A pinned-up poster; only the image tilts, so no text is resampled. */
     rotate: var(--tilt);
   }
   .label {
-    color: var(--red);
+    color: var(--accent);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;

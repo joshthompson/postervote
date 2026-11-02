@@ -82,7 +82,7 @@
   let open = $state(false);
   let loaded = $state(0);
   let ready = $state(false);
-  type Next = { name: string; posters: PosterInfo[] };
+  type Next = { slug: string; name: string; posters: PosterInfo[] };
   let run = $state<{ startAt: number; spawns: Spawn[]; next: Next | null } | null>(null);
   // The next collection as the preview shows it, fixed when it opens.
   let next = $state<Next | null>(null);
@@ -96,7 +96,7 @@
     ready = false;
     run = null;
     loaded = 0;
-    next = nextSlug && nextData.posters ? { name: nextName, posters: pickNext(nextData.posters) } : null;
+    next = nextSlug && nextData.posters ? { slug: nextSlug, name: nextName, posters: pickNext(nextData.posters) } : null;
     images = await preloadPosters([...ranked, ...(next?.posters ?? [])], () => loaded++);
     await Promise.all([document.fonts.load('64px "Remi Pop"'), document.fonts.load('800 56px "Bricolage Grotesque"')]);
     if (!open) return;
@@ -197,7 +197,7 @@
 {/if}
 
 {#if open}
-  <Stage startAt={run?.startAt} beats={ending(!!next).end}>
+  <Stage startAt={run?.startAt} beats={ending(!!next).end} collection={data.collection?.slug}>
     {#if run}
       {#key run}
         <Reel startAt={run.startAt} spawns={run.spawns} {top} {name} votes={data.votes} next={run.next} />
@@ -278,7 +278,7 @@
     gap: 10px;
     width: 100%;
     padding-top: 14px;
-    border-top: 1px solid rgba(31, 26, 36, 0.12);
+    border-top: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
     color: var(--muted);
     font-size: 14px;
   }

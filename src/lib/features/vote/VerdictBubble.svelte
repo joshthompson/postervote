@@ -41,8 +41,8 @@
     line-height: 1.15;
     letter-spacing: -0.02em;
     box-shadow:
-      0 2px 4px rgba(31, 26, 36, 0.06),
-      0 24px 60px -18px rgba(31, 26, 36, 0.45);
+      0 2px 4px color-mix(in srgb, var(--ink) 6%, transparent),
+      0 24px 60px -18px color-mix(in srgb, var(--ink) 45%, transparent);
     pointer-events: none;
     animation: bubble-in 0.7s var(--spring) both 0.25s;
   }

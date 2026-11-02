@@ -57,7 +57,7 @@
     transform: translateY(-2px) rotate(-2deg) scale(1.05);
   }
   .pill:focus-visible {
-    outline: 3px solid var(--yellow);
+    outline: 3px solid var(--accent-2);
     outline-offset: 3px;
   }
 
@@ -67,16 +67,16 @@
     color: var(--paper);
   }
   .ink:hover {
-    background: var(--red);
-    border-color: var(--red);
+    background: var(--accent);
+    border-color: var(--accent);
   }
   .red {
-    background: var(--red);
-    border-color: var(--red);
+    background: var(--accent);
+    border-color: var(--accent);
     color: white;
   }
   .outline {
-    background: rgba(255, 247, 238, 0.8);
+    background: color-mix(in srgb, var(--paper) 80%, transparent);
     backdrop-filter: blur(6px);
     border-color: var(--ink);
     color: var(--ink);

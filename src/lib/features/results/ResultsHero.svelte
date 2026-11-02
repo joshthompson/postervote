@@ -9,7 +9,7 @@
 <section class="hero">
   <h1>
     <span class="word" style="--i:0"><PixelText text={heading[0]} color="var(--ink)" /></span>
-    <span class="word" style="--i:1"><PixelText text={heading[1]} color="var(--red)" /></span>
+    <span class="word" style="--i:1"><PixelText text={heading[1]} color="var(--accent)" /></span>
   </h1>
   <svg class="squiggle" viewBox="0 0 300 20" preserveAspectRatio="none" aria-hidden="true">
     <path d="M2 12 Q 20 2, 40 12 T 80 12 T 120 12 T 160 12 T 200 12 T 240 12 T 280 12 T 298 10" />
@@ -54,7 +54,7 @@
   }
   .squiggle path {
     fill: none;
-    stroke: var(--yellow);
+    stroke: var(--accent-2);
     stroke-width: 5;
     stroke-linecap: round;
     stroke-dasharray: 400;

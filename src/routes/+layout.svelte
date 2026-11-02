@@ -4,6 +4,7 @@
   import { afterNavigate } from '$app/navigation';
   import CoffeeButton from '$lib/components/layout/CoffeeButton.svelte';
   import PolkaDots from '$lib/components/layout/PolkaDots.svelte';
+  import CollectionTheme from '$lib/features/collections/CollectionTheme.svelte';
   import SetupNotice from '$lib/components/layout/SetupNotice.svelte';
   import SiteHeader from '$lib/components/layout/SiteHeader.svelte';
   import SiteShareButton from '$lib/features/share/SiteShareButton.svelte';
@@ -31,7 +32,11 @@
 <!-- Browsers only allow audio after a gesture, so the first click or key press starts it. -->
 <svelte:window onpointerdown={() => sound.unlock()} onkeydown={() => sound.unlock()} />
 
-<PolkaDots />
+{#if configured}
+  <CollectionTheme />
+{:else}
+  <PolkaDots />
+{/if}
 <SiteHeader withMenu={configured} />
 
 <main>

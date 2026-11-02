@@ -4,7 +4,7 @@
   // Text set in the hand-drawn pixel letters (the Remi Pop font, see ./glyphs). Characters
   // without a letter (e.g. "&") fall back to the site font at the same size.
   // `px` is screen pixels per art pixel; keep it whole so the pixels stay sharp.
-  // `color` colours the letters (any CSS colour, e.g. "white" or "var(--red)"); they're black
+  // `color` colours the letters (any CSS colour, e.g. "white" or "var(--accent)"); they're black
   // otherwise, like the drawings.
   // Lines wrap at spaces; use a non-breaking space (\u00a0) to keep words together.
   // A word too wide for the screen shrinks the whole text to the largest whole px that fits.

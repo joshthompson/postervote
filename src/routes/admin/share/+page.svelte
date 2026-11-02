@@ -82,7 +82,7 @@
 </svelte:head>
 
 <Page width="wide">
-  <PageTitle text="Share links" color="var(--red)" />
+  <PageTitle text="Share links" color="var(--accent)" />
   <div class="layout">
     <Card>
       <form onsubmit={(e) => e.preventDefault()}>
@@ -173,7 +173,7 @@
   }
   input:focus-visible,
   select:focus-visible {
-    outline: 3px solid var(--yellow);
+    outline: 3px solid var(--accent-2);
     outline-offset: 2px;
   }
   .hint {

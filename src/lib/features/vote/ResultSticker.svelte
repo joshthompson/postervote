@@ -32,7 +32,7 @@
     text-align: center;
     background: var(--ink);
     color: var(--paper);
-    box-shadow: 0 10px 30px -8px rgba(31, 26, 36, 0.5);
+    box-shadow: 0 10px 30px -8px color-mix(in srgb, var(--ink) 50%, transparent);
     animation: sticker 0.8s var(--spring) both 0.1s;
     z-index: 2;
   }
@@ -43,7 +43,7 @@
     right: -22px;
   }
   .winner {
-    background: var(--red);
+    background: var(--accent);
   }
   strong {
     font-size: clamp(22px, 2.6vw, 36px);

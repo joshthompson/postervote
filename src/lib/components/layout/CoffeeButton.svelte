@@ -36,10 +36,10 @@
   /* Lift by whole pixels only, as the socials do, so the lettering stays sharp. */
   .full:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px -10px rgba(31, 26, 36, 0.6);
+    box-shadow: 0 10px 20px -10px color-mix(in srgb, var(--ink) 60%, transparent);
   }
   .full:focus-visible {
-    outline: 3px solid var(--red);
+    outline: 3px solid var(--accent);
     outline-offset: 3px;
   }
   .full img {

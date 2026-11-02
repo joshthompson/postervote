@@ -1,7 +1,7 @@
 <script lang="ts">
   // Square confetti falling over the whole stage, without end. Needs --beat from the reel.
 
-  const COLORS = ['#ff3b5c', '#ffb000', '#ff7a93', '#1f1a24', '#ff6a2b'];
+  const COLORS = ['var(--accent)', 'var(--accent-2)', 'var(--accent-soft)', 'var(--ink)', 'var(--accent)'];
   const COUNT = 70;
 
   const rand = (min: number, max: number) => min + Math.random() * (max - min);

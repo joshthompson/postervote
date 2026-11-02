@@ -13,6 +13,6 @@
 </svelte:head>
 
 <Page width="wide">
-  <PageTitle text="Stats" color="var(--red)" />
+  <PageTitle text="Stats" color="var(--accent)" />
   <StatsView />
 </Page>

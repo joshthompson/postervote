@@ -1,16 +1,23 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import PolkaDots from '$lib/components/layout/PolkaDots.svelte';
+  import { paletteFor, paletteStyle } from '$lib/features/collections/palettes';
   import { BEAT_MS, HEIGHT, WIDTH } from './timeline';
 
   // The video's frame over a black screen that covers the whole page, header and all: the
   // polka dots, with the reel on top (`children`), as large as fits the window. In a window the
   // video's size, that's one CSS pixel per video pixel. `hint` sits in the black under it.
   // `startAt` is when the video starts (a performance.now() time) and `beats` how long it is, so
-  // the dots loop with it.
+  // the dots loop with it. It's in the colours of `collection` (a slug).
 
-  let { startAt, beats, children, hint }: { startAt?: number; beats: number; children?: Snippet; hint?: Snippet } =
-    $props();
+  let {
+    startAt,
+    beats,
+    collection,
+    children,
+    hint
+  }: { startAt?: number; beats: number; collection?: string; children?: Snippet; hint?: Snippet } = $props();
+  const palette = $derived(paletteFor(collection));
   const loop = $derived(startAt === undefined ? undefined : { start: startAt, seconds: (beats * BEAT_MS) / 1000 });
 
   let innerWidth = $state(WIDTH);
@@ -31,9 +38,9 @@
     class="stage"
     style="width: {WIDTH}px; height: {HEIGHT}px; left: {Math.round((innerWidth - WIDTH) / 2)}px; top: {Math.round(
       (innerHeight - HEIGHT) / 2
-    )}px; transform: scale({scale})"
+    )}px; transform: scale({scale}); {paletteStyle(palette)}"
   >
-    <PolkaDots contained interactive={false} {loop} />
+    <PolkaDots contained interactive={false} {loop} colors={palette.dots} />
     {@render children?.()}
   </div>
   {#if hint}<p class="hint">{@render hint()}</p>{/if}

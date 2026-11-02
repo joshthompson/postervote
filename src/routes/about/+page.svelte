@@ -48,7 +48,7 @@
 </svelte:head>
 
 <Page>
-  <PageTitle text={t.title} color="var(--red)" />
+  <PageTitle text={t.title} color="var(--accent)" />
   <div class="sections">
     <Card delay={0.15}>
       <p class="label">{t.madeBy}</p>
@@ -170,10 +170,10 @@
   /* Lift by whole pixels only: rotating or scaling text resamples it and it blurs. */
   .social:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px -10px rgba(31, 26, 36, 0.6);
+    box-shadow: 0 10px 20px -10px color-mix(in srgb, var(--ink) 60%, transparent);
   }
   .social:focus-visible {
-    outline: 3px solid var(--red);
+    outline: 3px solid var(--accent);
     outline-offset: 3px;
   }
   .social img {

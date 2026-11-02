@@ -35,7 +35,7 @@
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(90deg, var(--yellow), var(--red));
+    background: linear-gradient(90deg, var(--accent-2), var(--accent));
     transition: width 0.6s var(--spring);
   }
 </style>

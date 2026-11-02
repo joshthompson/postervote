@@ -23,7 +23,7 @@ button {
 }
 
 code {
-  background: rgba(31, 26, 36, 0.07);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
   padding: 0.1em 0.4em;
   border-radius: 6px;
 }

@@ -18,6 +18,12 @@ export const find = (ctx: QueryCtx, slug?: string) =>
         .unique()
     : getActive(ctx);
 
+/** The live collection's slug, or null when none is: the site's colours follow it. */
+export const live = query({
+  args: {},
+  handler: async (ctx) => (await getActive(ctx))?.slug ?? null
+});
+
 const PREVIEW = 3;
 
 /**

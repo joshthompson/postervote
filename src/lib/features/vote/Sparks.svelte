@@ -1,7 +1,7 @@
 <script lang="ts">
   // A burst of confetti dots from the centre of the chosen poster. A fresh burst on every mount.
 
-  const COLORS = ['#ff3b5c', '#ffb000', '#ff7a93', '#1f1a24'];
+  const COLORS = ['var(--accent)', 'var(--accent-2)', 'var(--accent-soft)', 'var(--ink)'];
   const COUNT = 18;
 
   const sparks = Array.from({ length: COUNT }, (_, k) => ({

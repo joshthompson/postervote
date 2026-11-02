@@ -41,7 +41,7 @@
   const nextData = useNextCollection(() => nextSlug);
 
   type Ranked = NonNullable<typeof data.ranked>;
-  type Next = { name: string; posters: PosterInfo[] };
+  type Next = { slug: string; name: string; posters: PosterInfo[] };
   // Fixed when the video starts, so votes coming in while it renders don't change it.
   let run = $state<{ startAt: number; spawns: Spawn[]; top: Ranked; votes: number; next: Next | null } | null>(null);
   let images: HTMLImageElement[] = [];
@@ -55,7 +55,7 @@
     else if (data.ranked && data.collection && (!nextSlug || (nextData.posters && nextData.title)) && !prepared) {
       prepared = true;
       const next = nextSlug
-        ? { name: params.get('nextName') || nextData.title || '', posters: pickNext(nextData.posters ?? []) }
+        ? { slug: nextSlug, name: params.get('nextName') || nextData.title || '', posters: pickNext(nextData.posters ?? []) }
         : null;
       prepare(data.ranked, data.collection.title, data.votes, next);
     }
@@ -126,7 +126,7 @@
   }
 </script>
 
-<Stage startAt={run?.startAt} beats={ending(!!nextSlug).end}>
+<Stage startAt={run?.startAt} beats={ending(!!nextSlug).end} collection={data.collection?.slug}>
   {#if run}
     <Reel startAt={run.startAt} spawns={run.spawns} top={run.top} {name} votes={run.votes} next={run.next} sfx={false} />
   {/if}

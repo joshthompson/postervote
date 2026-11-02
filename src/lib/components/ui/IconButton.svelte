@@ -60,7 +60,7 @@
   }
   .icon-button:hover {
     transform: rotate(8deg) scale(1.08);
-    background: var(--red);
+    background: var(--accent);
   }
   .icon-button.muted {
     background: var(--muted);

@@ -97,7 +97,7 @@
           {x}
           y={yOf(p.designers.rating)}
           {r}
-          ring={p.designers.rating > p.others.rating ? 'var(--red)' : 'var(--ink)'}
+          ring={p.designers.rating > p.others.rating ? 'var(--accent)' : 'var(--ink)'}
           lines={lines(p)}
           align={x < 110 ? 'start' : x > width - 110 ? 'end' : 'center'}
           delay={Math.min(i, 30) * 25}
@@ -118,13 +118,13 @@
     overflow: visible;
   }
   .designers {
-    fill: rgba(255, 59, 92, 0.06);
+    fill: color-mix(in srgb, var(--accent) 6%, transparent);
   }
   .others {
-    fill: rgba(31, 26, 36, 0.04);
+    fill: color-mix(in srgb, var(--ink) 4%, transparent);
   }
   .grid {
-    stroke: rgba(31, 26, 36, 0.08);
+    stroke: color-mix(in srgb, var(--ink) 8%, transparent);
   }
   .agree {
     stroke: var(--muted);

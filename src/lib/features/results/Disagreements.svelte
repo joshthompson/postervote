@@ -17,7 +17,7 @@
 
   const t = $derived(i18n.t.results);
   const groups = $derived([
-    { key: 'designers', label: t.designers, fill: 'var(--red)' },
+    { key: 'designers', label: t.designers, fill: 'var(--accent)' },
     { key: 'others', label: t.others, fill: 'var(--ink)' }
   ] as const);
 </script>

@@ -114,7 +114,7 @@
     }
   }
   button:focus-visible {
-    outline: 3px solid var(--yellow);
+    outline: 3px solid var(--accent-2);
     outline-offset: 3px;
   }
 
@@ -125,7 +125,7 @@
   .paper {
     background: var(--card);
     color: var(--ink);
-    box-shadow: 0 8px 24px -6px rgba(255, 59, 92, 0.5);
+    box-shadow: 0 8px 24px -6px color-mix(in srgb, var(--accent) 50%, transparent);
   }
   .autoplay,
   .arrow {
@@ -136,7 +136,7 @@
   }
   .next {
     padding: 0 1.6em;
-    background: var(--red);
+    background: var(--accent);
     color: white;
   }
   /* "Past Votes", autoplay and "Next →" side by side must fit a 375px phone. */
@@ -158,10 +158,10 @@
     fill: none;
   }
   .track {
-    stroke: rgba(255, 59, 92, 0.18);
+    stroke: color-mix(in srgb, var(--accent) 18%, transparent);
   }
   .fill {
-    stroke: var(--red);
+    stroke: var(--accent);
     stroke-dasharray: 100;
     animation: fill var(--duration) linear forwards;
   }

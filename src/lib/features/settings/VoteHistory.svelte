@@ -39,7 +39,7 @@
     font-size: 18px;
   }
   strong {
-    color: var(--red);
+    color: var(--accent);
     font-weight: 800;
   }
   .hint {

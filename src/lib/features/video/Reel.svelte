@@ -4,6 +4,7 @@
   import { widestWord } from '$lib/components/pixel/glyphs';
   import { SITE } from '$lib/features/share/links';
   import type { PosterInfo } from '$lib/services/posters.svelte';
+  import { paletteFor, paletteStyle } from '$lib/features/collections/palettes';
   import { sound } from '$lib/services/sound.svelte';
   import { posterSrc } from '$lib/utils/images';
   import PixelWords from './PixelWords.svelte';
@@ -31,8 +32,8 @@
     top: Finalist[];
     name: string;
     votes: number;
-    /** The collection to vote on next: its name and a few of its posters. */
-    next?: { name: string; posters: Finalist[] } | null;
+    /** The collection to vote on next: its slug (for its colours), name and a few of its posters. */
+    next?: { slug: string; name: string; posters: Finalist[] } | null;
     sfx?: boolean;
   } = $props();
 
@@ -172,7 +173,7 @@
 
   {#if next && end.next && now >= end.next.in && now < end.next.out + 1}
     {@const at = end.next}
-    <div class="next" class:leaving={now >= at.out}>
+    <div class="next" class:leaving={now >= at.out} style={paletteStyle(paletteFor(next.slug))}>
       <PixelWords text="Up next" px={3} />
       <div class="name" style="--in: {at.name - at.in}">
         <PixelWords text={next.name} px={nextPx} color="white" delay={at.name - at.in} tilt={3} />
@@ -183,7 +184,7 @@
         {/each}
       </div>
       <div class="vote-now" style="--in: {at.vote - at.in}">
-        <PixelWords text="Vote now!" px={2} color="var(--yellow)" delay={at.vote - at.in} tilt={4} />
+        <PixelWords text="Vote now!" px={2} color="var(--accent-2)" delay={at.vote - at.in} tilt={4} />
       </div>
     </div>
   {/if}
@@ -241,7 +242,7 @@
       bounce var(--beat) ease-out calc(var(--beat) * 3) infinite;
   }
   .line:first-child .letter {
-    color: var(--red);
+    color: var(--accent);
   }
   @keyframes drop {
     from {
@@ -304,8 +305,8 @@
   .url {
     padding: 14px 30px 18px;
     border-radius: 999px;
-    background: var(--red);
-    box-shadow: 0 20px 50px -12px rgba(255, 59, 92, 0.6);
+    background: var(--accent);
+    box-shadow: 0 20px 50px -12px color-mix(in srgb, var(--accent) 60%, transparent);
     color: white;
     font: 800 56px / 1 'Bricolage Grotesque', system-ui, sans-serif;
     letter-spacing: -0.02em;
@@ -344,8 +345,8 @@
     rotate: -3deg;
   }
   .name {
-    background: var(--red);
-    box-shadow: 0 20px 50px -12px rgba(255, 59, 92, 0.6);
+    background: var(--accent);
+    box-shadow: 0 20px 50px -12px color-mix(in srgb, var(--accent) 60%, transparent);
     animation: pop calc(var(--beat) * 0.75) var(--spring) calc(var(--beat) * var(--in)) both;
   }
   .next {
@@ -368,8 +369,8 @@
     object-fit: cover;
     border: 6px solid white;
     border-radius: 6px;
-    background: #f3ebe2;
-    box-shadow: 0 18px 40px -14px rgba(31, 26, 36, 0.55);
+    background: color-mix(in srgb, var(--ink) 5%, var(--paper));
+    box-shadow: 0 18px 40px -14px color-mix(in srgb, var(--ink) 55%, transparent);
     translate: var(--x) var(--y);
     rotate: var(--rot);
     animation: fan-in var(--beat) var(--spring) calc(var(--beat) * var(--d)) both;
@@ -448,8 +449,8 @@
     object-fit: cover;
     border: calc(var(--w) * 0.03) solid white;
     border-radius: 6px;
-    background: #f3ebe2;
-    box-shadow: 0 18px 40px -14px rgba(31, 26, 36, 0.55);
+    background: color-mix(in srgb, var(--ink) 5%, var(--paper));
+    box-shadow: 0 18px 40px -14px color-mix(in srgb, var(--ink) 55%, transparent);
   }
 
   .counter {
@@ -473,7 +474,7 @@
   .count {
     min-width: 6ch;
     font: 800 64px / 1 var(--font-pixel);
-    color: var(--yellow);
+    color: var(--accent-2);
     text-align: center;
     font-variant-numeric: tabular-nums;
   }

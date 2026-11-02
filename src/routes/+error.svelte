@@ -23,7 +23,7 @@
 </svelte:head>
 
 <Page>
-  <PageTitle text={String(page.status)} color="var(--red)" />
+  <PageTitle text={String(page.status)} color="var(--accent)" />
   <div class="center">
     <MessageCard title={notFound ? t.notFoundTitle : t.title}>
       <p>{notFound ? t.notFoundBody : t.body}</p>

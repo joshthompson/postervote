@@ -16,12 +16,12 @@
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background: var(--red);
+    background: var(--accent);
     animation: bounce 0.9s ease-in-out infinite;
   }
   i:nth-child(2) {
     animation-delay: 0.15s;
-    background: var(--yellow);
+    background: var(--accent-2);
   }
   i:nth-child(3) {
     animation-delay: 0.3s;

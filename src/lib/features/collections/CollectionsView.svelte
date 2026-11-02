@@ -125,7 +125,7 @@
     box-shadow: var(--shadow-lift);
   }
   .entry.live {
-    border-color: var(--red);
+    border-color: var(--accent);
   }
   .entry.draft {
     border: 3px dashed var(--muted);
@@ -153,7 +153,7 @@
     object-fit: cover;
     border: clamp(3px, 0.6vw, 6px) solid white;
     border-radius: 6px;
-    box-shadow: 0 18px 36px -16px rgba(31, 26, 36, 0.55);
+    box-shadow: 0 18px 36px -16px color-mix(in srgb, var(--ink) 55%, transparent);
     transition: transform 0.5s var(--spring);
   }
   .place-1 {
@@ -208,7 +208,7 @@
     outline: none;
   }
   h2 a:focus-visible::after {
-    outline: 3px solid var(--yellow);
+    outline: 3px solid var(--accent-2);
     outline-offset: 4px;
   }
   .period {
@@ -229,7 +229,7 @@
     margin-right: 4px;
     padding: 0.15em 0.6em;
     border-radius: 999px;
-    background: var(--yellow);
+    background: var(--accent-2);
     font-weight: 800;
     font-size: 12px;
     text-transform: uppercase;
@@ -246,7 +246,7 @@
     gap: 8px;
     padding: 0.3em 0.9em;
     border-radius: 999px;
-    background: var(--red);
+    background: var(--accent);
     color: white;
     font-weight: 800;
     font-size: 12px;

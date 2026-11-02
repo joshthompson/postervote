@@ -196,7 +196,7 @@
   }
   .rank {
     margin: 0;
-    color: var(--red);
+    color: var(--accent);
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -239,7 +239,7 @@
   .stats div {
     padding: 12px;
     border-radius: 14px;
-    background: rgba(31, 26, 36, 0.05);
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
   }
   dt {
     color: var(--muted);
@@ -289,11 +289,11 @@
     gap: 6px;
     padding: 5px 12px 5px 8px;
     border-radius: 99px;
-    background: rgba(31, 26, 36, 0.05);
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
     font-size: 14px;
   }
   .fans li.first {
-    background: var(--yellow);
+    background: var(--accent-2);
   }
   .fans strong {
     font-size: 12px;
@@ -329,12 +329,12 @@
     min-width: 3.2em;
     padding: 2px 8px;
     border-radius: 99px;
-    background: rgba(31, 26, 36, 0.06);
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
     text-align: center;
     font-weight: 700;
   }
   .won .score {
-    background: var(--red);
+    background: var(--accent);
     color: #fff;
   }
   .lost .score {

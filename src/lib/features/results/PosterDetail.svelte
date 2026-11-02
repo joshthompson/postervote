@@ -65,7 +65,7 @@
     animation: pop 0.4s var(--spring);
   }
   dialog::backdrop {
-    background: rgba(31, 26, 36, 0.55);
+    background: color-mix(in srgb, var(--ink) 55%, transparent);
     backdrop-filter: blur(4px);
   }
   @keyframes pop {

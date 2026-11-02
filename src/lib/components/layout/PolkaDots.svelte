@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { DEFAULT_PALETTE } from '$lib/features/collections/palettes';
 
   // A field of hand-drawn pixel dots that fade in and out on their own and swell around the pointer.
   // Everything is drawn onto a low-res canvas with smoothing off, then upscaled with
@@ -7,19 +8,20 @@
   // `contained` fills the nearest positioned parent instead of the viewport; `interactive` off
   // leaves the pointer out (e.g. in a video). `loop` repeats the dots exactly every `seconds` from
   // `start` (a performance.now() time), so a looping video's last frame runs into its first.
+  // `colors` are the dots' colours (a collection's palette); when they change, each dot takes the
+  // new ones as it next comes back.
 
   type Loop = { start: number; seconds: number };
   let {
     contained = false,
     interactive = true,
-    loop
-  }: { contained?: boolean; interactive?: boolean; loop?: Loop } = $props();
+    loop,
+    colors = DEFAULT_PALETTE.dots
+  }: { contained?: boolean; interactive?: boolean; loop?: Loop; colors?: string[] } = $props();
 
   const SPRITE_URLS = Object.values(
     import.meta.glob('../../assets/dots/*.png', { eager: true, query: '?url', import: 'default' })
   ) as string[];
-
-  const COLORS = ['#ff2d55', '#ff2d55', '#ff2d55', '#ff5c85', '#ffb300', '#ff6a2b'];
 
   type Sprite = { canvas: HTMLCanvasElement; aspect: number };
   type Dot = {
@@ -42,6 +44,13 @@
 
   let field: HTMLDivElement;
   let canvas: HTMLCanvasElement;
+  /** Makes the dots in `colors`, once their images have loaded. */
+  let recolor: ((colors: string[]) => void) | undefined;
+  $effect(() => {
+    // Read even before the images have loaded, so later changes are seen.
+    const next = colors;
+    recolor?.(next);
+  });
 
   function loadImage(src: string) {
     return new Promise<HTMLImageElement>((resolve, reject) => {
@@ -93,6 +102,7 @@
     let fh = 0;
     let frame = 0;
     let disposed = false;
+    let shownAt = 0;
     const pointer = { x: -9999, y: -9999, tx: -9999, ty: -9999 };
 
     const rand = (min: number, max: number) => min + Math.random() * (max - min);
@@ -213,9 +223,23 @@
 
     Promise.all(SPRITE_URLS.map(loadImage)).then((images) => {
       if (disposed) return;
-      sprites = images.flatMap((img) =>
-        COLORS.flatMap((color) => [0, 1, 2, 3].map((flip) => makeSprite(img, color, flip)))
-      );
+      recolor = (colors) => {
+        const first = !sprites.length;
+        sprites = images.flatMap((img) =>
+          colors.flatMap((color) => [0, 1, 2, 3].map((flip) => makeSprite(img, color, flip)))
+        );
+        if (first) return;
+        // Changed straight after the page opened (the palette's only just known), every dot changes
+        // at once; so do a looping video's, and, with motion reduced, ones that would never come back.
+        const now = reduceMotion || performance.now() - shownAt < 2000;
+        for (const d of cells.values()) {
+          d.looped = undefined;
+          if (now) d.sprite = randomSprite();
+        }
+        if (reduceMotion) draw(performance.now());
+      };
+      recolor(colors);
+      shownAt = performance.now();
       build();
       frame = requestAnimationFrame(draw);
       resizeObserver.observe(field);

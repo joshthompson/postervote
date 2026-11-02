@@ -49,7 +49,7 @@
     text-decoration: none;
   }
   .pick:focus-visible {
-    outline: 3px solid var(--red);
+    outline: 3px solid var(--accent);
     outline-offset: 6px;
     border-radius: 10px;
   }
@@ -73,7 +73,7 @@
     object-fit: cover;
     border: clamp(4px, 0.8vw, 10px) solid white;
     border-radius: 6px;
-    box-shadow: 0 24px 50px -18px rgba(31, 26, 36, 0.5);
+    box-shadow: 0 24px 50px -18px color-mix(in srgb, var(--ink) 50%, transparent);
   }
   .medal {
     position: absolute;
@@ -92,11 +92,11 @@
     animation-delay: calc(1s + (3 - var(--i)) * 0.18s);
   }
   .place-1 .medal {
-    background: var(--red);
+    background: var(--accent);
     width: clamp(52px, 6.5vw, 76px);
   }
   .place-2 .medal {
-    background: var(--yellow);
+    background: var(--accent-2);
     color: var(--ink);
   }
   @keyframes spin-in {
@@ -126,10 +126,10 @@
   }
   .place-1 .plinth {
     height: 76px;
-    background: var(--red);
+    background: var(--accent);
   }
   .place-2 .plinth {
     height: 52px;
-    background: var(--yellow);
+    background: var(--accent-2);
   }
 </style>

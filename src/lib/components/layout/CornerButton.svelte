@@ -63,7 +63,7 @@
     -webkit-tap-highlight-color: transparent;
   }
   .corner:focus-visible {
-    outline: 3px solid var(--red);
+    outline: 3px solid var(--accent);
     outline-offset: 4px;
   }
   .square {

@@ -138,8 +138,8 @@
     object-fit: cover;
     border: 10px solid white;
     border-radius: 8px;
-    background: #f3ebe2;
-    box-shadow: 0 24px 50px -18px rgba(31, 26, 36, 0.55);
+    background: color-mix(in srgb, var(--ink) 5%, var(--paper));
+    box-shadow: 0 24px 50px -18px color-mix(in srgb, var(--ink) 55%, transparent);
   }
   .place-1 img {
     animation: glow var(--beat) ease-out infinite;
@@ -147,13 +147,13 @@
   @keyframes glow {
     from {
       box-shadow:
-        0 0 0 10px var(--red),
-        0 30px 80px -10px rgba(255, 59, 92, 0.7);
+        0 0 0 10px var(--accent),
+        0 30px 80px -10px color-mix(in srgb, var(--accent) 70%, transparent);
     }
     to {
       box-shadow:
-        0 0 0 6px var(--red),
-        0 24px 50px -18px rgba(31, 26, 36, 0.55);
+        0 0 0 6px var(--accent),
+        0 24px 50px -18px color-mix(in srgb, var(--ink) 55%, transparent);
     }
   }
 
@@ -170,11 +170,11 @@
     font: 800 64px / 1 var(--font-pixel);
     background: var(--ink);
     color: var(--paper);
-    box-shadow: 0 10px 24px -8px rgba(31, 26, 36, 0.6);
+    box-shadow: 0 10px 24px -8px color-mix(in srgb, var(--ink) 60%, transparent);
     animation: medal calc(var(--beat) * 1.5) var(--spring) calc(var(--beat) * 0.5) both;
   }
   .place-2 .medal {
-    background: var(--yellow);
+    background: var(--accent-2);
     color: var(--ink);
   }
   @keyframes medal {
@@ -228,8 +228,8 @@
     z-index: 4;
     padding: 14px 26px 18px;
     border-radius: 999px;
-    background: var(--red);
-    box-shadow: 0 16px 40px -10px rgba(255, 59, 92, 0.7);
+    background: var(--accent);
+    box-shadow: 0 16px 40px -10px color-mix(in srgb, var(--accent) 70%, transparent);
     transform: translateX(-50%) rotate(-7deg);
     animation: stamp calc(var(--beat) * 0.75) var(--spring) both;
   }
@@ -249,7 +249,7 @@
     aspect-ratio: 1;
     margin: -600px 0 0 -600px;
     z-index: 1;
-    background: repeating-conic-gradient(rgba(255, 176, 0, 0.45) 0 9deg, transparent 9deg 18deg);
+    background: repeating-conic-gradient(color-mix(in srgb, var(--accent-2) 45%, transparent) 0 9deg, transparent 9deg 18deg);
     mask: radial-gradient(closest-side, black 20%, transparent 100%);
     animation:
       rays-in calc(var(--beat) * 2) var(--smooth) both,

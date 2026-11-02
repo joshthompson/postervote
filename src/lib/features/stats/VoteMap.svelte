@@ -253,7 +253,7 @@
     display: block;
     width: 100%;
     border-radius: 14px;
-    background: rgba(31, 26, 36, 0.025);
+    background: color-mix(in srgb, var(--ink) 2.5%, transparent);
   }
   path,
   circle {
@@ -263,7 +263,7 @@
     stroke-linejoin: round;
   }
   path {
-    fill: rgba(31, 26, 36, 0.09);
+    fill: color-mix(in srgb, var(--ink) 9%, transparent);
     transition: fill 0.4s;
   }
   .voted {
@@ -323,7 +323,7 @@
     margin-left: auto;
   }
   .none {
-    color: rgba(255, 247, 238, 0.7);
+    color: color-mix(in srgb, var(--paper) 70%, transparent);
   }
   .list {
     display: grid;
@@ -350,7 +350,7 @@
     transition: background 0.2s;
   }
   li.on {
-    background: rgba(31, 26, 36, 0.06);
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
   }
   .rank {
     min-width: 2ch;
@@ -376,7 +376,7 @@
     bottom: 3px;
     height: 3px;
     border-radius: 2px;
-    background: linear-gradient(to right, var(--c) var(--w), rgba(31, 26, 36, 0.06) var(--w));
+    background: linear-gradient(to right, var(--c) var(--w), color-mix(in srgb, var(--ink) 6%, transparent) var(--w));
   }
   .empty {
     color: var(--muted);

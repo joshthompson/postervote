@@ -44,7 +44,7 @@
   /* Lift by whole pixels only: rotating or scaling text resamples it and it blurs. */
   .duel-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 24px 44px -20px rgba(31, 26, 36, 0.5);
+    box-shadow: 0 24px 44px -20px color-mix(in srgb, var(--ink) 50%, transparent);
   }
   header {
     display: flex;
@@ -74,7 +74,7 @@
     object-fit: cover;
     border: 5px solid white;
     border-radius: 4px;
-    box-shadow: 0 10px 24px -12px rgba(31, 26, 36, 0.5);
+    box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--ink) 50%, transparent);
   }
   img:first-child {
     rotate: -4deg;
@@ -89,7 +89,7 @@
     width: 38px;
     height: 38px;
     border-radius: 50%;
-    background: var(--yellow);
+    background: var(--accent-2);
     font-weight: 800;
     font-size: 14px;
   }
@@ -101,7 +101,7 @@
     gap: 3px;
   }
   .split i {
-    background: var(--red);
+    background: var(--accent);
     transition: flex 0.8s var(--smooth);
   }
   .split i:last-child {

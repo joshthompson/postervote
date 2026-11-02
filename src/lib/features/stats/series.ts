@@ -8,7 +8,7 @@ export type Group = 'designers' | 'others' | 'unknown';
 /** Stacked bottom to top in this order. */
 export const GROUPS: Group[] = ['designers', 'others', 'unknown'];
 export const GROUP_LABEL: Record<Group, string> = { designers: 'Designers', others: 'Non-designers', unknown: 'Not asked' };
-export const GROUP_COLOR: Record<Group, string> = { designers: 'var(--red)', others: 'var(--ink)', unknown: '#bdb6c0' };
+export const GROUP_COLOR: Record<Group, string> = { designers: 'var(--accent)', others: 'var(--ink)', unknown: '#bdb6c0' };
 
 export type Split = Record<Group, number>;
 /** One bar: its axis label, the heading of its tooltip, and its count per group. `marked` is today. */

@@ -52,6 +52,7 @@ Each visitor sees the pairs in their own fixed order. Taking a poster out leaves
 `pnpm collections` (`scripts/collections.mjs`) does it all. Add `--prod` for production; with no command, it lists the collections in Convex (drafts too) and in `archives/`.
 
 1. **Draft the next one.** Give `collection.json` a new slug and title, replace the images and `titles.json`, and run `pnpm collections draft`. The new collection is in Convex but not live: visitors don't see it, and it can't be voted on. Run it again after changing images or titles. To draft from a folder prepared elsewhere, leaving `posters/` as it is, add `--dir <folder>` (it needs its own `collection.json` and `titles.json`), and pass the slug to `publish`. To get rid of a draft, run `pnpm collections discard <slug>`.
+   Give it its own colours, if you like, in `src/lib/features/collections/palettes.ts` (see "Colours" below).
 2. **Look it over.** Run `setDevMode(true)` in the browser console (`setDevMode(false)` turns it off). Dev mode is remembered on that device, and while it's on, drafts show on `/collections` and at `/collections/<slug>`, labelled as drafts. It only hides drafts; it doesn't protect them. Anyone who knows a draft's slug can ask Convex for its posters, though nothing in the built site gives one away.
 3. **Deploy its images.** Commit `static/posters/<slug>/` and deploy.
 4. **Publish it.** Run `pnpm collections publish`, which publishes the draft named in `collection.json`, or pass a slug. In one go, it:
@@ -82,6 +83,12 @@ Titles default to the filename (`001.jpg` becomes "No. 1"). To set your own, add
 ```
 
 `posters/` holds the originals and is gitignored, apart from `collection.json` and `titles.json`. Commit `static/posters/`, which holds the optimised copies.
+
+## Colours
+
+Each collection can have its own palette, in `src/lib/features/collections/palettes.ts`, keyed by slug: the background (`paper`), text (`ink`, `muted`), accents (`accent`, `accentSoft`, `accent2`) and the polka dots' colours. A collection without one has the first collection's pinks and yellows. Components only use the tokens in `src/lib/styles/tokens.css` (`var(--accent)`, or `color-mix(in srgb, var(--accent) 50%, transparent)` for a see-through one), never colours of their own, so a palette changes everything.
+
+A collection's own pages (its rankings, its posters' pages) are in its palette, and every other page is in the live collection's (`CollectionTheme.svelte`). Changing palette fades from one to the other, and each polka dot takes the new colours as it next comes back. The winner video is in its collection's palette, and its "Up next" in the next collection's.
 
 ## Pixel letters
 
