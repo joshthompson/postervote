@@ -1,0 +1,1 @@
+var e=`https://postervote.com`;function t(e,t){let n=new URL(e);for(let[e,r]of Object.entries(t))r&&n.searchParams.set(`utm_${e}`,r);return n.href}var n=e=>e.trim().toLowerCase().replace(/[^a-z0-9-]+/g,`_`).replace(/^_+|_+$/g,``);export{n,t as r,e as t};

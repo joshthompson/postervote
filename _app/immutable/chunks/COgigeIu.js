@@ -1,0 +1,1 @@
+import{F as e,N as t,Q as n,gt as r,i}from"./0LWt9EVT.js";import"./xihTtKlq.js";import{t as a}from"./BvDsGMm7.js";var o=e(`<h1 class="svelte-dnrf5e"><!></h1>`);function s(e,s){let c=i(s,`color`,3,`var(--ink)`);var l=o(),u=n(l);a(u,{get text(){return s.text},get color(){return c()}}),r(l),t(e,l)}export{s as t};
