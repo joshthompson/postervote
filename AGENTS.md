@@ -89,6 +89,6 @@ Links we hand out carry UTM parameters saying where they were handed out. Mixpan
 
 - `utm_campaign` is optional, e.g. a collection's slug.
 - Values are lowercase snake_case. Never change one once its link is out, and keep a list of the links handed out.
-- Make links and QR codes (PNG or SVG) on `/admin/share`. It's hidden: nothing links to it, it asks search engines to skip it, its page views aren't tracked, and it has no sign-in.
+- Make links and QR codes (PNG or SVG) on `/admin/share`, and, on `/admin/share/poster`, posters to print (PDF or PNG, A5 to A3) with the QR code tagged `utm_medium=qr` and `utm_campaign` as the collection's slug, in the collection's colours and named after it (`features/share/poster.ts`). Both keep what's filled in in the address, so a link to the page opens it filled in. They're hidden: nothing links to them, they ask search engines to skip them, their page views aren't tracked, and there's no sign-in.
 - `withUtm()` and `SITE` are in `src/lib/features/share/links.ts`; the share buttons use them too.
 - The SDK marks `store_google` as deprecated. If an update stops it adding the tags to every event (they'd only be on page views), register `utm_*` from the landing URL as super properties in `analytics.ts`.

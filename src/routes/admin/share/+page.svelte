@@ -1,39 +1,40 @@
 <script lang="ts">
   import { encode } from 'uqr';
-  import Page from '$lib/components/layout/Page.svelte';
+  import { page } from '$app/state';
   import Card from '$lib/components/ui/Card.svelte';
-  import PageTitle from '$lib/components/ui/PageTitle.svelte';
   import Pill from '$lib/components/ui/Pill.svelte';
-  import { SITE, withUtm } from '$lib/features/share/links';
+  import { SITE, cleanUtm as clean, withUtm } from '$lib/features/share/links';
+  import { saveFile as save } from '$lib/utils/download';
+  import { syncSearchParams } from '$lib/utils/searchParams.svelte';
 
-  // A hidden page for making links to the site, tagged with where they're handed out, and QR codes
-  // for them. Nothing links here, search engines are asked to skip it, and its visits aren't
-  // counted (see +layout.svelte); there's no sign-in. See "Sources" in AGENTS.md for the values.
-  // English only, as it's just for us.
+  // Links to the site, tagged with where they're handed out, and QR codes for them. What's filled in
+  // is kept in the address (see +layout.svelte).
 
   const PAGES = [
-    { label: 'Vote', path: '/' },
-    { label: 'Rankings', path: '/results' },
-    { label: 'About', path: '/about' }
+    { key: 'vote', label: 'Vote', path: '/' },
+    { key: 'rankings', label: 'Rankings', path: '/results' },
+    { key: 'about', label: 'About', path: '/about' }
   ];
   const MEDIUMS = ['qr', 'community', 'social', 'email', 'print'];
   // Screen pixels per QR square in the PNG, big enough to print.
   const PNG_SCALE = 32;
 
-  let path = $state('/');
-  let source = $state('');
-  let medium = $state('qr');
-  let content = $state('');
-  let campaign = $state('');
+  const query = page.url.searchParams;
+  let path = $state(PAGES.find((p) => p.key === query.get('page'))?.path ?? '/');
+  let source = $state(query.get('source') ?? '');
+  let medium = $state(query.get('medium') ?? 'qr');
+  let content = $state(query.get('content') ?? '');
+  let campaign = $state(query.get('campaign') ?? '');
   let copied = $state(false);
 
-  /** Lowercase, with runs of anything but letters, digits and hyphens as one underscore. */
-  const clean = (value: string) =>
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9-]+/g, '_')
-      .replace(/^_+|_+$/g, '');
+  syncSearchParams(() => ({
+    page: path === '/' ? undefined : PAGES.find((p) => p.path === path)?.key,
+    source: source || undefined,
+    // Empty is kept: a medium deliberately cleared.
+    medium: medium === 'qr' ? undefined : medium,
+    content: content || undefined,
+    campaign: campaign || undefined
+  }));
 
   const utm = $derived({ source: clean(source), medium: clean(medium), content: clean(content), campaign: clean(campaign) });
   const url = $derived(utm.source && utm.medium ? withUtm(SITE + path, utm) : '');
@@ -52,14 +53,6 @@
     setTimeout(() => (copied = false), 2000);
   }
 
-  function save(blob: Blob, name: string) {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  }
-
   const saveSvg = () => save(new Blob([svg], { type: 'image/svg+xml' }), `${fileName}.svg`);
 
   function savePng() {
@@ -76,69 +69,61 @@
   }
 </script>
 
-<svelte:head>
-  <title>Share links · Poster Vote</title>
-  <meta name="robots" content="noindex, nofollow" />
-</svelte:head>
-
-<Page width="wide">
-  <PageTitle text="Share links" color="var(--accent)" />
-  <div class="layout">
-    <Card>
-      <form onsubmit={(e) => e.preventDefault()}>
-        <label>
-          <span class="name">Page</span>
-          <select bind:value={path}>
-            {#each PAGES as p (p.path)}<option value={p.path}>{p.label}</option>{/each}
-          </select>
-        </label>
-        <label>
-          <span class="name">Source <code>utm_source</code></span>
-          <input bind:value={source} placeholder="e.g. design_school, telegram_designers" required />
-          <span class="hint">Exactly where it's handed out: the school, the community.</span>
-        </label>
-        <label>
-          <span class="name">Medium <code>utm_medium</code></span>
-          <input bind:value={medium} list="mediums" required />
-          <datalist id="mediums">
-            {#each MEDIUMS as m (m)}<option value={m}></option>{/each}
-          </datalist>
-          <span class="hint">The kind of channel: <code>qr</code>, <code>community</code>, …</span>
-        </label>
-        <label>
-          <span class="name">Content <code>utm_content</code> <em>optional</em></span>
-          <input bind:value={content} placeholder="e.g. entrance, cafe" />
-          <span class="hint">Which one, when there are several: each QR code's spot.</span>
-        </label>
-        <label>
-          <span class="name">Campaign <code>utm_campaign</code> <em>optional</em></span>
-          <input bind:value={campaign} placeholder="e.g. stockholm-2026-09" />
-          <span class="hint">Which push, if you want to tell them apart.</span>
-        </label>
-        <p class="hint">
-          Values are made lowercase, with underscores for spaces. Once a link is out, don't change its
-          values, and keep a list of every link you hand out.
-        </p>
-      </form>
-    </Card>
-    <Card delay={0.15}>
-      {#if url}
-        <div class="result">
-          <!-- Built from the QR's squares, not from anything typed in. -->
-          <div class="qr">{@html svg}</div>
-          <code class="url">{url}</code>
-          <div class="actions">
-            <Pill variant="red" onclick={copy}>{copied ? 'Copied!' : 'Copy link'}</Pill>
-            <Pill variant="ink" onclick={savePng}>Download PNG</Pill>
-            <Pill variant="ink" onclick={saveSvg}>Download SVG</Pill>
-          </div>
+<div class="layout">
+  <Card>
+    <form onsubmit={(e) => e.preventDefault()}>
+      <label>
+        <span class="name">Page</span>
+        <select bind:value={path}>
+          {#each PAGES as p (p.path)}<option value={p.path}>{p.label}</option>{/each}
+        </select>
+      </label>
+      <label>
+        <span class="name">Source <code>utm_source</code></span>
+        <input bind:value={source} placeholder="e.g. school, telegram_designers" required />
+        <span class="hint">Exactly where it's handed out: the school, the community.</span>
+      </label>
+      <label>
+        <span class="name">Medium <code>utm_medium</code></span>
+        <input bind:value={medium} list="mediums" required />
+        <datalist id="mediums">
+          {#each MEDIUMS as m (m)}<option value={m}></option>{/each}
+        </datalist>
+        <span class="hint">The kind of channel: <code>qr</code>, <code>community</code>, …</span>
+      </label>
+      <label>
+        <span class="name">Content <code>utm_content</code> <em>optional</em></span>
+        <input bind:value={content} placeholder="e.g. entrance, cafe" />
+        <span class="hint">Which one, when there are several: each QR code's spot.</span>
+      </label>
+      <label>
+        <span class="name">Campaign <code>utm_campaign</code> <em>optional</em></span>
+        <input bind:value={campaign} placeholder="e.g. stockholm-2026-09" />
+        <span class="hint">Which push, if you want to tell them apart.</span>
+      </label>
+      <p class="hint">
+        Values are made lowercase, with underscores for spaces. Once a link is out, don't change its
+        values, and keep a list of every link you hand out.
+      </p>
+    </form>
+  </Card>
+  <Card delay={0.15}>
+    {#if url}
+      <div class="result">
+        <!-- Built from the QR's squares, not from anything typed in. -->
+        <div class="qr">{@html svg}</div>
+        <code class="url">{url}</code>
+        <div class="actions">
+          <Pill variant="red" onclick={copy}>{copied ? 'Copied!' : 'Copy link'}</Pill>
+          <Pill variant="ink" onclick={savePng}>Download PNG</Pill>
+          <Pill variant="ink" onclick={saveSvg}>Download SVG</Pill>
         </div>
-      {:else}
-        <p class="empty">Fill in a source and a medium to make a link.</p>
-      {/if}
-    </Card>
-  </div>
-</Page>
+      </div>
+    {:else}
+      <p class="empty">Fill in a source and a medium to make a link.</p>
+    {/if}
+  </Card>
+</div>
 
 <style>
   .layout {

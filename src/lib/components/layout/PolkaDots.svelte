@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { DEFAULT_PALETTE } from '$lib/features/collections/palettes';
+  import { loadDots, makeSprites, type Sprite } from '$lib/utils/dots';
 
   // A field of hand-drawn pixel dots that fade in and out on their own and swell around the pointer.
   // Everything is drawn onto a low-res canvas with smoothing off, then upscaled with
@@ -19,11 +20,6 @@
     colors = DEFAULT_PALETTE.dots
   }: { contained?: boolean; interactive?: boolean; loop?: Loop; colors?: string[] } = $props();
 
-  const SPRITE_URLS = Object.values(
-    import.meta.glob('../../assets/dots/*.png', { eager: true, query: '?url', import: 'default' })
-  ) as string[];
-
-  type Sprite = { canvas: HTMLCanvasElement; aspect: number };
   type Dot = {
     x: number;
     y: number;
@@ -51,42 +47,6 @@
     const next = colors;
     recolor?.(next);
   });
-
-  function loadImage(src: string) {
-    return new Promise<HTMLImageElement>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = src;
-    });
-  }
-
-  /** Solid-colour copy of a dot image with hard 1-bit alpha, in one of four orientations. */
-  function makeSprite(img: HTMLImageElement, color: string, flip: number): Sprite {
-    const c = document.createElement('canvas');
-    c.width = img.naturalWidth;
-    c.height = img.naturalHeight;
-    const ctx = c.getContext('2d')!;
-    ctx.imageSmoothingEnabled = false;
-    ctx.translate(flip & 1 ? c.width : 0, flip & 2 ? c.height : 0);
-    ctx.scale(flip & 1 ? -1 : 1, flip & 2 ? -1 : 1);
-    ctx.drawImage(img, 0, 0);
-
-    const data = ctx.getImageData(0, 0, c.width, c.height);
-    const r = parseInt(color.slice(1, 3), 16);
-    const g = parseInt(color.slice(3, 5), 16);
-    const b = parseInt(color.slice(5, 7), 16);
-    for (let i = 0; i < data.data.length; i += 4) {
-      const solid = data.data[i + 3] >= 128;
-      data.data[i] = r;
-      data.data[i + 1] = g;
-      data.data[i + 2] = b;
-      data.data[i + 3] = solid ? 255 : 0;
-    }
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.putImageData(data, 0, 0);
-    return { canvas: c, aspect: c.height / c.width };
-  }
 
   onMount(() => {
     const ctx = canvas.getContext('2d')!;
@@ -221,13 +181,11 @@
       pointer.tx = pointer.ty = -9999;
     };
 
-    Promise.all(SPRITE_URLS.map(loadImage)).then((images) => {
+    loadDots().then((images) => {
       if (disposed) return;
       recolor = (colors) => {
         const first = !sprites.length;
-        sprites = images.flatMap((img) =>
-          colors.flatMap((color) => [0, 1, 2, 3].map((flip) => makeSprite(img, color, flip)))
-        );
+        sprites = makeSprites(images, colors);
         if (first) return;
         // Changed straight after the page opened (the palette's only just known), every dot changes
         // at once; so do a looping video's, and, with motion reduced, ones that would never come back.

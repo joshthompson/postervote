@@ -14,3 +14,11 @@ export function withUtm(url: string, utm: Utm): string {
   for (const [key, value] of Object.entries(utm)) if (value) tagged.searchParams.set(`utm_${key}`, value);
   return tagged.href;
 }
+
+/** A UTM value as we write them: lowercase, with runs of anything but letters, digits and hyphens as one underscore. */
+export const cleanUtm = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '_')
+    .replace(/^_+|_+$/g, '');
