@@ -296,6 +296,8 @@ export const en = {
     },
     detail: {
       close: 'Close',
+      previous: 'Previous poster',
+      next: 'Next poster',
       rank: (rank: number) => `No. ${num(rank)}`,
       points: 'Points',
       record: 'Won–lost',

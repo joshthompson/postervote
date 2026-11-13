@@ -80,7 +80,11 @@ export type Events = {
   poster_details_opened: AboutPoster & {
     poster_rank?: number;
     view: View;
-    placement: 'podium' | 'leaderboard' | 'local_picks' | 'disagreements';
+    /** `rankings_modal` is a step to the poster before or after, with the modal's arrows. */
+    placement: 'podium' | 'leaderboard' | 'local_picks' | 'disagreements' | 'rankings_modal';
+    /** On a step only, like `direction`. */
+    method?: Method;
+    direction?: 'previous' | 'next';
   };
   nav_link_clicked: {
     destination: NavDestination;

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { pushState } from '$app/navigation';
+  import { pushState, replaceState } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import Loader from '$lib/components/ui/Loader.svelte';
@@ -10,6 +10,7 @@
   import { track } from '$lib/services/analytics';
   import { usePosters } from '$lib/services/posters.svelte';
   import { devMode } from '$lib/state/devMode.svelte';
+  import { posterSrc, preload } from '$lib/utils/images';
   import { visibility } from '$lib/state/visibility.svelte';
   import Disagreements from './Disagreements.svelte';
   import Highlights from './Highlights.svelte';
@@ -112,6 +113,36 @@
   // The poster open in the modal, looked up in the live list so its numbers keep updating.
   const openPoster = $derived(data?.posters.find((p) => p._id === page.state.poster) ?? null);
   const openHref = $derived(openPoster && collection ? hrefFor(openPoster) : undefined);
+  // The modal's arrows step through the posters in the order they're listed: by gap in the
+  // disagreements, by rank everywhere else. Each step swaps the address for the new poster's page
+  // without adding to the history, so Back still closes the modal.
+  const order = $derived((view === 'disagree' && split ? split.posters : (data?.posters ?? [])).map((p) => p._id));
+  const openAt = $derived(openPoster ? order.indexOf(openPoster._id) : -1);
+  const stepTo = (at: number) =>
+    openAt >= 0 && order[at]
+      ? (method: 'click' | 'keyboard') => {
+          const id = order[at];
+          replaceState(hrefFor({ _id: id }), { poster: id });
+          track('poster_details_opened', {
+            collection: collection!.slug,
+            poster_id: id,
+            poster_title: posterById.get(id)!.title,
+            poster_rank: data?.posters.find((r) => r._id === id)?.rank,
+            view,
+            placement: 'rankings_modal',
+            method,
+            direction: at < openAt ? 'previous' : 'next'
+          });
+        }
+      : undefined;
+  // The neighbours' images load ahead, so a step shows its poster straight away.
+  $effect(() => {
+    for (const id of [order[openAt - 1], order[openAt + 1]]) {
+      const p = openAt >= 0 && id && posterById.get(id);
+      if (p) preload(posterSrc(p.image));
+    }
+  });
+
   // Closing it goes back to the rankings' URL; after Back, it's already there.
   const onclose = () => page.state.poster && history.back();
   const onshare = (outcome: ShareOutcome) =>
@@ -203,7 +234,17 @@
   {/if}
 {/if}
 
-<PosterDetail poster={openPoster} {segment} collection={slug} {posterById} shareHref={openHref} {onshare} {onclose} />
+<PosterDetail
+  poster={openPoster}
+  {segment}
+  collection={slug}
+  {posterById}
+  shareHref={openHref}
+  {onshare}
+  {onclose}
+  previous={stepTo(openAt - 1)}
+  next={stepTo(openAt + 1)}
+/>
 
 <style>
   .loading {

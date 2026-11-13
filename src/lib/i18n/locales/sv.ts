@@ -282,6 +282,8 @@ export const sv: Messages = {
     },
     detail: {
       close: 'Stäng',
+      previous: 'Föregående affisch',
+      next: 'Nästa affisch',
       rank: (rank: number) => `Nr ${num(rank)}`,
       points: 'Poäng',
       record: 'Vunna–förlorade',

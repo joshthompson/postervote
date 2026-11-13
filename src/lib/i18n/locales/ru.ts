@@ -290,6 +290,8 @@ export const ru: Messages = {
     },
     detail: {
       close: 'Закрыть',
+      previous: 'Предыдущий постер',
+      next: 'Следующий постер',
       rank: (rank: number) => `№ ${num(rank)}`,
       points: 'Очки',
       record: 'Победы–поражения',
