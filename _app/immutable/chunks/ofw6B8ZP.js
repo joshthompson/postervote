@@ -1,0 +1,1 @@
+import{c as e}from"./DQ6C7QaM.js";function t(t){return/^https?:\/\//.test(t)?t:e(`/${t}`)}function n(e){return new Promise(t=>{let n=new Image;n.onload=n.onerror=()=>t(),n.src=e})}export{n,t};
